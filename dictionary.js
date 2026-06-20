@@ -48,6 +48,14 @@ window.SERENA_DICTIONARY = [
     type: "verb"
   },
   {
+    id: "chi",
+    chinese: "吃",
+    pinyin: "chī",
+    meaning: "есть / кушать",
+    level: 1,
+    type: "verb"
+  },
+  {
     id: "shui",
     chinese: "水",
     pinyin: "shuǐ",
@@ -60,6 +68,14 @@ window.SERENA_DICTIONARY = [
     chinese: "茶",
     pinyin: "chá",
     meaning: "чай",
+    level: 1,
+    type: "noun"
+  },
+  {
+    id: "fan",
+    chinese: "饭",
+    pinyin: "fàn",
+    meaning: "еда / рис",
     level: 1,
     type: "noun"
   },
@@ -78,5 +94,69 @@ window.SERENA_DICTIONARY = [
     meaning: "быть / являться",
     level: 1,
     type: "verb"
+  },
+  {
+    id: "bu",
+    chinese: "不",
+    pinyin: "bù",
+    meaning: "не / нет",
+    level: 1,
+    type: "particle"
+  },
+  {
+    id: "ma",
+    chinese: "吗",
+    pinyin: "ma",
+    meaning: "вопросительная частица",
+    level: 1,
+    type: "particle"
+  },
+  {
+    id: "xiexie",
+    chinese: "谢谢",
+    pinyin: "xièxie",
+    meaning: "спасибо",
+    level: 1,
+    type: "phrase"
+  },
+  {
+    id: "zaijian",
+    chinese: "再见",
+    pinyin: "zàijiàn",
+    meaning: "до свидания",
+    level: 1,
+    type: "phrase"
+  },
+  {
+    id: "mama",
+    chinese: "妈妈",
+    pinyin: "māma",
+    meaning: "мама",
+    level: 1,
+    type: "noun"
+  },
+  {
+    id: "baba",
+    chinese: "爸爸",
+    pinyin: "bàba",
+    meaning: "папа",
+    level: 1,
+    type: "noun"
+  },
+  {
+    id: "pengyou",
+    chinese: "朋友",
+    pinyin: "péngyou",
+    meaning: "друг",
+    level: 1,
+    type: "noun"
+  },
+  {
+    id: "zhongwen",
+    chinese: "中文",
+    pinyin: "zhōngwén",
+    meaning: "китайский язык",
+    level: 1,
+    type: "noun"
   }
 ];
