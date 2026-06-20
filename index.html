@@ -1,0 +1,1390 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Serena Chinese</title>
+
+  <style>
+    /* =========================
+       CSS: внешний вид приложения
+       ========================= */
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f0ff;
+      text-align: center;
+      padding: 30px;
+    }
+
+    .app {
+      background: white;
+      max-width: 900px;
+      margin: auto;
+      padding: 30px;
+      border-radius: 20px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.1);
+    }
+
+    h1 {
+      color: #6b3fd6;
+      margin-bottom: 10px;
+    }
+
+    .tabs {
+      margin: 20px 0;
+    }
+
+    .tab-button {
+      background: #ddd;
+      color: #333;
+    }
+
+    .tab-button.active {
+      background: #6b3fd6;
+      color: white;
+    }
+
+    .mode {
+      display: none;
+    }
+
+    .mode.active {
+      display: block;
+    }
+
+    .lesson-title {
+      color: #777;
+      margin-bottom: 20px;
+    }
+
+    .chinese {
+      font-size: 70px;
+      margin: 25px 0 10px;
+    }
+
+    .pinyin {
+      font-size: 26px;
+      color: #555;
+    }
+
+    .meaning {
+      font-size: 26px;
+      margin: 20px;
+      color: #222;
+      min-height: 35px;
+    }
+
+    .progress {
+      margin: 20px 0;
+      color: #444;
+      font-size: 18px;
+    }
+
+    button {
+      font-size: 16px;
+      padding: 10px 16px;
+      margin: 6px;
+      border: none;
+      border-radius: 12px;
+      background: #6b3fd6;
+      color: white;
+      cursor: pointer;
+    }
+
+    button:hover {
+      opacity: 0.9;
+    }
+
+    .known {
+      background: #24a148;
+    }
+
+    .repeat {
+      background: #d35400;
+    }
+
+    .delete {
+      background: #b00020;
+    }
+
+    .edit {
+      background: #0077b6;
+    }
+
+    .clear {
+      background: #555;
+    }
+
+    .hard {
+      background: #d35400;
+    }
+
+    .good {
+      background: #24a148;
+    }
+
+    .add-box,
+    .word-list,
+    .writing-box,
+    .sentence-box {
+      margin-top: 35px;
+      padding: 20px;
+      border-radius: 16px;
+      background: #f2ecff;
+    }
+
+    .add-box h2,
+    .word-list h2,
+    .writing-box h2,
+    .sentence-box h2 {
+      margin-top: 0;
+      color: #6b3fd6;
+    }
+
+    input {
+      width: 90%;
+      padding: 12px;
+      margin: 8px 0;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+    }
+
+    .message {
+      color: #24a148;
+      font-weight: bold;
+      min-height: 24px;
+    }
+
+    .error-message {
+      color: #b00020;
+      font-weight: bold;
+      min-height: 24px;
+    }
+
+    .word-item {
+      background: white;
+      margin: 12px 0;
+      padding: 14px;
+      border-radius: 12px;
+      text-align: left;
+      box-shadow: 0 0 8px rgba(0,0,0,0.05);
+    }
+
+    .word-main {
+      font-size: 26px;
+      font-weight: bold;
+    }
+
+    .word-details {
+      color: #555;
+      margin-top: 6px;
+    }
+
+    .word-status {
+      margin-top: 6px;
+      font-size: 14px;
+      color: #6b3fd6;
+    }
+
+    .word-buttons {
+      margin-top: 10px;
+      text-align: right;
+    }
+
+    /* =========================
+       CSS: режим письма иероглифов
+       ========================= */
+
+    .writing-target {
+      font-size: 80px;
+      margin: 20px 0 5px;
+    }
+
+    .writing-info {
+      font-size: 20px;
+      color: #555;
+      margin-bottom: 20px;
+      min-height: 28px;
+    }
+
+    .character-canvases {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 18px;
+      margin: 20px 0;
+    }
+
+    .character-card {
+      background: white;
+      padding: 12px;
+      border-radius: 16px;
+      box-shadow: 0 0 8px rgba(0,0,0,0.08);
+    }
+
+    .character-label {
+      font-size: 34px;
+      color: #6b3fd6;
+      margin-bottom: 8px;
+    }
+
+    .character-canvas {
+      background: white;
+      border: 2px solid #6b3fd6;
+      border-radius: 14px;
+      width: 180px;
+      height: 180px;
+      touch-action: none;
+    }
+
+    .writing-result {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 16px;
+      background: white;
+      min-height: 60px;
+    }
+
+    .result-title {
+      font-weight: bold;
+      color: #6b3fd6;
+      margin-bottom: 10px;
+    }
+
+    .result-images {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .result-images img {
+      width: 90px;
+      height: 90px;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      background: white;
+    }
+
+    .small-note {
+      color: #666;
+      font-size: 14px;
+      margin-top: 10px;
+    }
+
+    /* =========================
+       CSS: режим предложений
+       ========================= */
+
+    .sentence-prompt {
+      font-size: 24px;
+      margin: 20px 0;
+      color: #333;
+    }
+
+    .selected-sentence {
+      min-height: 60px;
+      background: white;
+      border: 2px dashed #6b3fd6;
+      border-radius: 16px;
+      padding: 15px;
+      margin: 20px 0;
+      font-size: 30px;
+    }
+
+    .word-bank {
+      margin: 20px 0;
+    }
+
+    .word-token {
+      font-size: 24px;
+      background: white;
+      color: #333;
+      border: 2px solid #6b3fd6;
+    }
+
+    .sentence-progress {
+      color: #444;
+      font-size: 16px;
+      margin-top: 15px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- =========================
+       HTML: структура приложения
+       ========================= -->
+
+  <div class="app">
+    <h1>Serena Chinese</h1>
+
+    <div class="tabs">
+      <button id="studyTab" class="tab-button active" onclick="showMode('study')">
+        Учить слова
+      </button>
+
+      <button id="writingTab" class="tab-button" onclick="showMode('writing')">
+        Писать иероглифы
+      </button>
+
+      <button id="sentenceTab" class="tab-button" onclick="showMode('sentence')">
+        Строить предложения
+      </button>
+    </div>
+
+    <!-- =========================
+         РЕЖИМ 1: УЧИТЬ СЛОВА
+         ========================= -->
+
+    <div id="studyMode" class="mode active">
+      <div class="lesson-title">Режим заучивания слов</div>
+
+      <div id="chineseWord" class="chinese"></div>
+      <div id="pinyin" class="pinyin"></div>
+      <div id="meaning" class="meaning">?</div>
+
+      <button onclick="showAnswer()">Показать ответ</button>
+
+      <div>
+        <button class="known" onclick="markKnown()">Я знаю</button>
+        <button class="repeat" onclick="markRepeat()">Повторить</button>
+      </div>
+
+      <div id="progress" class="progress"></div>
+
+      <div class="add-box">
+        <h2 id="formTitle">Добавить новое слово</h2>
+
+        <input id="newChinese" placeholder="Китайское слово, например: 水">
+        <input id="newPinyin" placeholder="Pinyin, например: shuǐ">
+        <input id="newMeaning" placeholder="Перевод, например: вода">
+
+        <button id="saveButton" onclick="saveWord()">Добавить слово</button>
+        <button onclick="cancelEdit()">Отменить</button>
+
+        <p id="message" class="message"></p>
+      </div>
+
+      <div class="word-list">
+        <h2>Мой список слов</h2>
+        <div id="wordList"></div>
+      </div>
+    </div>
+
+    <!-- =========================
+         РЕЖИМ 2: ПИСАТЬ ИЕРОГЛИФЫ
+         ========================= -->
+
+    <div id="writingMode" class="mode">
+      <div class="lesson-title">Режим письма: только уже выученные слова</div>
+
+      <div class="writing-box">
+        <h2>Напиши иероглифы рукой</h2>
+
+        <div id="writingTarget" class="writing-target"></div>
+        <div id="writingInfo" class="writing-info"></div>
+
+        <div id="characterCanvases" class="character-canvases"></div>
+
+        <div>
+          <button class="clear" onclick="clearAllCanvases()">Очистить все</button>
+          <button onclick="showWritingResult()">Показать итог</button>
+          <button onclick="nextWritingWord()">Следующий</button>
+        </div>
+
+        <div>
+          <button class="good" onclick="markWritingGood()">Получилось</button>
+          <button class="hard" onclick="markWritingHard()">Трудно</button>
+        </div>
+
+        <div id="writingResult" class="writing-result"></div>
+
+        <p id="writingMessage" class="message"></p>
+
+        <p class="small-note">
+          Если слово состоит из одного иероглифа — будет одно поле. Если из двух — два поля. Если из трёх — три поля.
+        </p>
+      </div>
+    </div>
+
+    <!-- =========================
+         РЕЖИМ 3: СТРОИТЬ ПРЕДЛОЖЕНИЯ
+         ========================= -->
+
+    <div id="sentenceMode" class="mode">
+      <div class="lesson-title">Режим предложений: строим фразы из выученных слов</div>
+
+      <div class="sentence-box">
+        <h2>Собери предложение</h2>
+
+        <div id="sentencePrompt" class="sentence-prompt"></div>
+
+        <div id="selectedSentence" class="selected-sentence"></div>
+
+        <div id="wordBank" class="word-bank"></div>
+
+        <div>
+          <button onclick="checkSentence()">Проверить</button>
+          <button class="clear" onclick="clearSentence()">Очистить</button>
+          <button onclick="nextSentenceExercise()">Следующее</button>
+        </div>
+
+        <p id="sentenceMessage" class="message"></p>
+
+        <div id="sentenceProgress" class="sentence-progress"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // =========================
+    // JavaScript: данные приложения
+    // =========================
+
+    function createId() {
+      return Date.now().toString() + "-" + Math.random().toString(16).slice(2);
+    }
+
+    let defaultWords = [
+      {
+        id: "word-1",
+        chinese: "你好",
+        pinyin: "nǐ hǎo",
+        meaning: "привет",
+        learned: false,
+        knownCount: 0,
+        repeatCount: 0,
+        writingGood: 0,
+        writingHard: 0
+      },
+      {
+        id: "word-2",
+        chinese: "谢谢",
+        pinyin: "xiè xie",
+        meaning: "спасибо",
+        learned: false,
+        knownCount: 0,
+        repeatCount: 0,
+        writingGood: 0,
+        writingHard: 0
+      },
+      {
+        id: "word-3",
+        chinese: "我",
+        pinyin: "wǒ",
+        meaning: "я",
+        learned: false,
+        knownCount: 0,
+        repeatCount: 0,
+        writingGood: 0,
+        writingHard: 0
+      },
+      {
+        id: "word-4",
+        chinese: "你",
+        pinyin: "nǐ",
+        meaning: "ты",
+        learned: false,
+        knownCount: 0,
+        repeatCount: 0,
+        writingGood: 0,
+        writingHard: 0
+      },
+      {
+        id: "word-5",
+        chinese: "他",
+        pinyin: "tā",
+        meaning: "он",
+        learned: false,
+        knownCount: 0,
+        repeatCount: 0,
+        writingGood: 0,
+        writingHard: 0
+      },
+      {
+        id: "word-6",
+        chinese: "她",
+        pinyin: "tā",
+        meaning: "она",
+        learned: false,
+        knownCount: 0,
+        repeatCount: 0,
+        writingGood: 0,
+        writingHard: 0
+      },
+      {
+        id: "word-7",
+        chinese: "爱",
+        pinyin: "ài",
+        meaning: "любить",
+        learned: false,
+        knownCount: 0,
+        repeatCount: 0,
+        writingGood: 0,
+        writingHard: 0
+      },
+      {
+        id: "word-8",
+        chinese: "妈妈",
+        pinyin: "mā ma",
+        meaning: "мама",
+        learned: false,
+        knownCount: 0,
+        repeatCount: 0,
+        writingGood: 0,
+        writingHard: 0
+      },
+      {
+        id: "word-9",
+        chinese: "爸爸",
+        pinyin: "bà ba",
+        meaning: "папа",
+        learned: false,
+        knownCount: 0,
+        repeatCount: 0,
+        writingGood: 0,
+        writingHard: 0
+      },
+      {
+        id: "word-10",
+        chinese: "中国",
+        pinyin: "Zhōng guó",
+        meaning: "Китай",
+        learned: false,
+        knownCount: 0,
+        repeatCount: 0,
+        writingGood: 0,
+        writingHard: 0
+      },
+      {
+        id: "word-11",
+        chinese: "水",
+        pinyin: "shuǐ",
+        meaning: "вода",
+        learned: false,
+        knownCount: 0,
+        repeatCount: 0,
+        writingGood: 0,
+        writingHard: 0
+      },
+      {
+        id: "word-12",
+        chinese: "茶",
+        pinyin: "chá",
+        meaning: "чай",
+        learned: false,
+        knownCount: 0,
+        repeatCount: 0,
+        writingGood: 0,
+        writingHard: 0
+      },
+      {
+        id: "word-13",
+        chinese: "喝",
+        pinyin: "hē",
+        meaning: "пить",
+        learned: false,
+        knownCount: 0,
+        repeatCount: 0,
+        writingGood: 0,
+        writingHard: 0
+      }
+    ];
+
+    let sentenceExercises = [
+      {
+        prompt: "Я люблю тебя",
+        correct: ["我", "爱", "你"],
+        bank: ["你", "我", "爱"],
+        explanation: "Порядок простой: кто + действие + кого/что. 我 = я, 爱 = люблю, 你 = тебя."
+      },
+      {
+        prompt: "Я люблю Китай",
+        correct: ["我", "爱", "中国"],
+        bank: ["中国", "爱", "我"],
+        explanation: "Порядок: кто + действие + объект. 我 = я, 爱 = люблю, 中国 = Китай."
+      },
+      {
+        prompt: "Ты любишь Китай",
+        correct: ["你", "爱", "中国"],
+        bank: ["中国", "你", "爱"],
+        explanation: "В китайском здесь порядок: 你 + 爱 + 中国."
+      },
+      {
+        prompt: "Он любит Китай",
+        correct: ["他", "爱", "中国"],
+        bank: ["爱", "中国", "他"],
+        explanation: "他 = он, 爱 = любит, 中国 = Китай."
+      },
+      {
+        prompt: "Она любит чай",
+        correct: ["她", "爱", "茶"],
+        bank: ["茶", "她", "爱"],
+        explanation: "她 = она, 爱 = любит, 茶 = чай."
+      },
+      {
+        prompt: "Я пью воду",
+        correct: ["我", "喝", "水"],
+        bank: ["水", "我", "喝"],
+        explanation: "我 = я, 喝 = пить, 水 = вода. Порядок: я + пить + воду."
+      },
+      {
+        prompt: "Ты пьёшь чай",
+        correct: ["你", "喝", "茶"],
+        bank: ["喝", "茶", "你"],
+        explanation: "你 = ты, 喝 = пить, 茶 = чай."
+      }
+    ];
+
+    let savedWords = localStorage.getItem("serenaChineseWords");
+    let words;
+
+    if (savedWords) {
+      words = JSON.parse(savedWords);
+      words = words.map(normalizeWord);
+    } else {
+      words = defaultWords;
+    }
+
+    let currentIndex = 0;
+    let editIndex = null;
+    let writingIndex = 0;
+    let sentenceIndex = 0;
+    let selectedSentenceWords = [];
+    let writingCanvases = [];
+
+    let sentenceCorrectCount = Number(localStorage.getItem("serenaSentenceCorrect")) || 0;
+    let sentenceWrongCount = Number(localStorage.getItem("serenaSentenceWrong")) || 0;
+
+    // =========================
+    // JavaScript: сохранение
+    // =========================
+
+    function normalizeWord(word) {
+      return {
+        id: word.id || createId(),
+        chinese: word.chinese || "",
+        pinyin: word.pinyin || "",
+        meaning: word.meaning || "",
+        learned: word.learned || false,
+        knownCount: word.knownCount || 0,
+        repeatCount: word.repeatCount || 0,
+        writingGood: word.writingGood || 0,
+        writingHard: word.writingHard || 0
+      };
+    }
+
+    function saveToBrowser() {
+      localStorage.setItem("serenaChineseWords", JSON.stringify(words));
+    }
+
+    function saveSentenceProgress() {
+      localStorage.setItem("serenaSentenceCorrect", sentenceCorrectCount);
+      localStorage.setItem("serenaSentenceWrong", sentenceWrongCount);
+    }
+
+    // =========================
+    // JavaScript: переключение режимов
+    // =========================
+
+    function showMode(modeName) {
+      document.getElementById("studyMode").classList.remove("active");
+      document.getElementById("writingMode").classList.remove("active");
+      document.getElementById("sentenceMode").classList.remove("active");
+
+      document.getElementById("studyTab").classList.remove("active");
+      document.getElementById("writingTab").classList.remove("active");
+      document.getElementById("sentenceTab").classList.remove("active");
+
+      if (modeName === "study") {
+        document.getElementById("studyMode").classList.add("active");
+        document.getElementById("studyTab").classList.add("active");
+      }
+
+      if (modeName === "writing") {
+        document.getElementById("writingMode").classList.add("active");
+        document.getElementById("writingTab").classList.add("active");
+        renderWritingWord();
+      }
+
+      if (modeName === "sentence") {
+        document.getElementById("sentenceMode").classList.add("active");
+        document.getElementById("sentenceTab").classList.add("active");
+        renderSentenceExercise();
+      }
+    }
+
+    // =========================
+    // JavaScript: режим 1 — учить слова
+    // =========================
+
+    function showCard() {
+      if (words.length === 0) {
+        document.getElementById("chineseWord").textContent = "—";
+        document.getElementById("pinyin").textContent = "";
+        document.getElementById("meaning").textContent = "Добавь первое слово";
+        updateProgress();
+        return;
+      }
+
+      document.getElementById("chineseWord").textContent = words[currentIndex].chinese;
+      document.getElementById("pinyin").textContent = words[currentIndex].pinyin;
+      document.getElementById("meaning").textContent = "?";
+
+      updateProgress();
+    }
+
+    function showAnswer() {
+      if (words.length === 0) {
+        return;
+      }
+
+      document.getElementById("meaning").textContent = words[currentIndex].meaning;
+    }
+
+    function nextWord() {
+      if (words.length === 0) {
+        showCard();
+        return;
+      }
+
+      currentIndex = currentIndex + 1;
+
+      if (currentIndex >= words.length) {
+        currentIndex = 0;
+      }
+
+      showCard();
+    }
+
+    function markKnown() {
+      if (words.length === 0) {
+        return;
+      }
+
+      words[currentIndex].learned = true;
+      words[currentIndex].knownCount = words[currentIndex].knownCount + 1;
+
+      saveToBrowser();
+      renderWordList();
+      renderSentenceExercise();
+      nextWord();
+    }
+
+    function markRepeat() {
+      if (words.length === 0) {
+        return;
+      }
+
+      words[currentIndex].repeatCount = words[currentIndex].repeatCount + 1;
+
+      saveToBrowser();
+      renderWordList();
+      nextWord();
+    }
+
+    function updateProgress() {
+      let learnedCount = words.filter(function(word) {
+        return word.learned === true;
+      }).length;
+
+      document.getElementById("progress").textContent =
+        "Всего слов: " + words.length +
+        " | Выучено: " + learnedCount +
+        " | Сейчас: " + (words.length === 0 ? 0 : currentIndex + 1);
+    }
+
+    function saveWord() {
+      let chineseInput = document.getElementById("newChinese");
+      let pinyinInput = document.getElementById("newPinyin");
+      let meaningInput = document.getElementById("newMeaning");
+
+      let newChinese = chineseInput.value.trim();
+      let newPinyin = pinyinInput.value.trim();
+      let newMeaning = meaningInput.value.trim();
+
+      if (newChinese === "" || newPinyin === "" || newMeaning === "") {
+        document.getElementById("message").textContent = "Заполни все три поля.";
+        return;
+      }
+
+      if (editIndex === null) {
+        let newWord = {
+          id: createId(),
+          chinese: newChinese,
+          pinyin: newPinyin,
+          meaning: newMeaning,
+          learned: false,
+          knownCount: 0,
+          repeatCount: 0,
+          writingGood: 0,
+          writingHard: 0
+        };
+
+        words.push(newWord);
+        currentIndex = words.length - 1;
+
+        document.getElementById("message").textContent = "Слово добавлено.";
+      } else {
+        words[editIndex].chinese = newChinese;
+        words[editIndex].pinyin = newPinyin;
+        words[editIndex].meaning = newMeaning;
+
+        currentIndex = editIndex;
+        editIndex = null;
+
+        document.getElementById("formTitle").textContent = "Добавить новое слово";
+        document.getElementById("saveButton").textContent = "Добавить слово";
+        document.getElementById("message").textContent = "Слово изменено.";
+      }
+
+      saveToBrowser();
+
+      chineseInput.value = "";
+      pinyinInput.value = "";
+      meaningInput.value = "";
+
+      showCard();
+      renderWordList();
+      renderWritingWord();
+      renderSentenceExercise();
+    }
+
+    function renderWordList() {
+      let wordList = document.getElementById("wordList");
+
+      wordList.innerHTML = "";
+
+      if (words.length === 0) {
+        wordList.textContent = "Список пока пуст.";
+        return;
+      }
+
+      for (let i = 0; i < words.length; i = i + 1) {
+        let wordItem = document.createElement("div");
+        wordItem.className = "word-item";
+
+        let wordMain = document.createElement("div");
+        wordMain.className = "word-main";
+        wordMain.textContent = words[i].chinese;
+
+        let wordDetails = document.createElement("div");
+        wordDetails.className = "word-details";
+        wordDetails.textContent = words[i].pinyin + " — " + words[i].meaning;
+
+        let wordStatus = document.createElement("div");
+        wordStatus.className = "word-status";
+
+        if (words[i].learned) {
+          wordStatus.textContent =
+            "Статус: выучено | Знаю: " +
+            words[i].knownCount +
+            " | Повторить: " +
+            words[i].repeatCount +
+            " | Письмо хорошо: " +
+            words[i].writingGood +
+            " | Письмо трудно: " +
+            words[i].writingHard;
+        } else {
+          wordStatus.textContent =
+            "Статус: ещё не выучено | Повторить: " + words[i].repeatCount;
+        }
+
+        let wordButtons = document.createElement("div");
+        wordButtons.className = "word-buttons";
+
+        let editButton = document.createElement("button");
+        editButton.className = "edit";
+        editButton.textContent = "Редактировать";
+        editButton.onclick = function() {
+          editWord(i);
+        };
+
+        let deleteButton = document.createElement("button");
+        deleteButton.className = "delete";
+        deleteButton.textContent = "Удалить";
+        deleteButton.onclick = function() {
+          deleteWord(i);
+        };
+
+        wordButtons.appendChild(editButton);
+        wordButtons.appendChild(deleteButton);
+
+        wordItem.appendChild(wordMain);
+        wordItem.appendChild(wordDetails);
+        wordItem.appendChild(wordStatus);
+        wordItem.appendChild(wordButtons);
+
+        wordList.appendChild(wordItem);
+      }
+    }
+
+    function editWord(index) {
+      editIndex = index;
+
+      document.getElementById("newChinese").value = words[index].chinese;
+      document.getElementById("newPinyin").value = words[index].pinyin;
+      document.getElementById("newMeaning").value = words[index].meaning;
+
+      document.getElementById("formTitle").textContent = "Редактировать слово";
+      document.getElementById("saveButton").textContent = "Сохранить изменения";
+      document.getElementById("message").textContent = "Ты редактируешь слово.";
+
+      showMode("study");
+    }
+
+    function deleteWord(index) {
+      words.splice(index, 1);
+
+      if (currentIndex >= words.length) {
+        currentIndex = 0;
+      }
+
+      editIndex = null;
+
+      saveToBrowser();
+      showCard();
+      renderWordList();
+      renderWritingWord();
+      renderSentenceExercise();
+
+      document.getElementById("message").textContent = "Слово удалено.";
+    }
+
+    function cancelEdit() {
+      editIndex = null;
+
+      document.getElementById("newChinese").value = "";
+      document.getElementById("newPinyin").value = "";
+      document.getElementById("newMeaning").value = "";
+
+      document.getElementById("formTitle").textContent = "Добавить новое слово";
+      document.getElementById("saveButton").textContent = "Добавить слово";
+      document.getElementById("message").textContent = "";
+    }
+
+    function getLearnedWords() {
+      return words.filter(function(word) {
+        return word.learned === true;
+      });
+    }
+
+    // =========================
+    // JavaScript: режим 2 — письмо иероглифов
+    // =========================
+
+    function renderWritingWord() {
+      let learnedWords = getLearnedWords();
+
+      if (learnedWords.length === 0) {
+        document.getElementById("writingTarget").textContent = "—";
+        document.getElementById("writingInfo").textContent =
+          "Пока нет выученных слов. В режиме слов нажми “Я знаю” хотя бы на одном слове.";
+
+        document.getElementById("characterCanvases").innerHTML = "";
+        document.getElementById("writingResult").innerHTML = "";
+        document.getElementById("writingMessage").textContent = "";
+
+        writingCanvases = [];
+        return;
+      }
+
+      if (writingIndex >= learnedWords.length) {
+        writingIndex = 0;
+      }
+
+      let currentWritingWord = learnedWords[writingIndex];
+
+      document.getElementById("writingTarget").textContent = currentWritingWord.chinese;
+
+      let characters = Array.from(currentWritingWord.chinese);
+
+      document.getElementById("writingInfo").textContent =
+        currentWritingWord.pinyin +
+        " — " +
+        currentWritingWord.meaning +
+        " | Иероглифов: " +
+        characters.length;
+
+      document.getElementById("writingMessage").textContent =
+        "Слово " + (writingIndex + 1) + " из " + learnedWords.length;
+
+      document.getElementById("writingResult").innerHTML = "";
+
+      createCharacterCanvases(characters);
+    }
+
+    function createCharacterCanvases(characters) {
+      let container = document.getElementById("characterCanvases");
+
+      container.innerHTML = "";
+      writingCanvases = [];
+
+      for (let i = 0; i < characters.length; i = i + 1) {
+        let characterCard = document.createElement("div");
+        characterCard.className = "character-card";
+
+        let characterLabel = document.createElement("div");
+        characterLabel.className = "character-label";
+        characterLabel.textContent = characters[i];
+
+        let canvas = document.createElement("canvas");
+        canvas.className = "character-canvas";
+        canvas.width = 180;
+        canvas.height = 180;
+
+        characterCard.appendChild(characterLabel);
+        characterCard.appendChild(canvas);
+
+        container.appendChild(characterCard);
+
+        let ctx = canvas.getContext("2d");
+
+        writingCanvases.push({
+          canvas: canvas,
+          ctx: ctx,
+          character: characters[i],
+          index: i
+        });
+
+        drawCanvasGrid(ctx, canvas);
+        setupCanvasDrawing(canvas, ctx);
+      }
+    }
+
+    function nextWritingWord() {
+      let learnedWords = getLearnedWords();
+
+      if (learnedWords.length === 0) {
+        renderWritingWord();
+        return;
+      }
+
+      writingIndex = writingIndex + 1;
+
+      if (writingIndex >= learnedWords.length) {
+        writingIndex = 0;
+      }
+
+      renderWritingWord();
+    }
+
+    function findOriginalWordIndex(wordId) {
+      return words.findIndex(function(word) {
+        return word.id === wordId;
+      });
+    }
+
+    function markWritingGood() {
+      let learnedWords = getLearnedWords();
+
+      if (learnedWords.length === 0) {
+        return;
+      }
+
+      let currentWritingWord = learnedWords[writingIndex];
+      let originalIndex = findOriginalWordIndex(currentWritingWord.id);
+
+      if (originalIndex !== -1) {
+        words[originalIndex].writingGood = words[originalIndex].writingGood + 1;
+        saveToBrowser();
+        renderWordList();
+      }
+
+      showWritingResult();
+
+      document.getElementById("writingMessage").textContent =
+        "Отмечено: получилось. Можешь перейти к следующему слову.";
+    }
+
+    function markWritingHard() {
+      let learnedWords = getLearnedWords();
+
+      if (learnedWords.length === 0) {
+        return;
+      }
+
+      let currentWritingWord = learnedWords[writingIndex];
+      let originalIndex = findOriginalWordIndex(currentWritingWord.id);
+
+      if (originalIndex !== -1) {
+        words[originalIndex].writingHard = words[originalIndex].writingHard + 1;
+        saveToBrowser();
+        renderWordList();
+      }
+
+      showWritingResult();
+
+      document.getElementById("writingMessage").textContent =
+        "Отмечено: трудно. Можешь попробовать ещё раз или перейти дальше.";
+    }
+
+    // =========================
+    // JavaScript: несколько canvas для письма
+    // =========================
+
+    function prepareBrush(ctx) {
+      ctx.strokeStyle = "#222";
+      ctx.lineWidth = 7;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+    }
+
+    function drawCanvasGrid(ctx, canvas) {
+      let width = canvas.width;
+      let height = canvas.height;
+
+      ctx.clearRect(0, 0, width, height);
+
+      ctx.strokeStyle = "#ddd";
+      ctx.lineWidth = 1;
+
+      ctx.beginPath();
+
+      ctx.moveTo(width / 2, 0);
+      ctx.lineTo(width / 2, height);
+
+      ctx.moveTo(0, height / 2);
+      ctx.lineTo(width, height / 2);
+
+      ctx.moveTo(0, 0);
+      ctx.lineTo(width, height);
+
+      ctx.moveTo(width, 0);
+      ctx.lineTo(0, height);
+
+      ctx.stroke();
+
+      prepareBrush(ctx);
+    }
+
+    function clearAllCanvases() {
+      for (let i = 0; i < writingCanvases.length; i = i + 1) {
+        drawCanvasGrid(writingCanvases[i].ctx, writingCanvases[i].canvas);
+      }
+
+      document.getElementById("writingResult").innerHTML = "";
+    }
+
+    function getCanvasPosition(event, canvas) {
+      let rect = canvas.getBoundingClientRect();
+
+      return {
+        x: (event.clientX - rect.left) * (canvas.width / rect.width),
+        y: (event.clientY - rect.top) * (canvas.height / rect.height)
+      };
+    }
+
+    function setupCanvasDrawing(canvas, ctx) {
+      let isDrawing = false;
+
+      function startDrawing(event) {
+        event.preventDefault();
+
+        isDrawing = true;
+
+        let position = getCanvasPosition(event, canvas);
+
+        ctx.beginPath();
+        ctx.moveTo(position.x, position.y);
+      }
+
+      function draw(event) {
+        if (!isDrawing) {
+          return;
+        }
+
+        event.preventDefault();
+
+        let position = getCanvasPosition(event, canvas);
+
+        ctx.lineTo(position.x, position.y);
+        ctx.stroke();
+      }
+
+      function stopDrawing() {
+        isDrawing = false;
+        ctx.closePath();
+      }
+
+      canvas.addEventListener("pointerdown", startDrawing);
+      canvas.addEventListener("pointermove", draw);
+      canvas.addEventListener("pointerup", stopDrawing);
+      canvas.addEventListener("pointercancel", stopDrawing);
+      canvas.addEventListener("pointerleave", stopDrawing);
+    }
+
+    function showWritingResult() {
+      let resultBox = document.getElementById("writingResult");
+
+      if (writingCanvases.length === 0) {
+        resultBox.innerHTML = "";
+        return;
+      }
+
+      resultBox.innerHTML = "";
+
+      let title = document.createElement("div");
+      title.className = "result-title";
+      title.textContent = "Твой итог:";
+
+      let imagesBox = document.createElement("div");
+      imagesBox.className = "result-images";
+
+      for (let i = 0; i < writingCanvases.length; i = i + 1) {
+        let image = document.createElement("img");
+        image.src = writingCanvases[i].canvas.toDataURL("image/png");
+        image.alt = "Твой написанный иероглиф " + writingCanvases[i].character;
+
+        imagesBox.appendChild(image);
+      }
+
+      resultBox.appendChild(title);
+      resultBox.appendChild(imagesBox);
+    }
+
+    // =========================
+    // JavaScript: режим 3 — предложения
+    // =========================
+
+    function getAvailableSentenceExercises() {
+      let learnedWords = getLearnedWords();
+
+      let learnedChineseWords = learnedWords.map(function(word) {
+        return word.chinese;
+      });
+
+      return sentenceExercises.filter(function(exercise) {
+        return exercise.correct.every(function(chineseWord) {
+          return learnedChineseWords.includes(chineseWord);
+        });
+      });
+    }
+
+    function renderSentenceExercise() {
+      let availableExercises = getAvailableSentenceExercises();
+
+      selectedSentenceWords = [];
+
+      updateSentenceProgress();
+
+      if (availableExercises.length === 0) {
+        document.getElementById("sentencePrompt").textContent =
+          "Пока нет доступных предложений.";
+
+        document.getElementById("selectedSentence").textContent =
+          "Сначала выучи нужные слова: 我, 爱, 你, 中国, 他, 她, 茶, 水, 喝.";
+
+        document.getElementById("wordBank").innerHTML = "";
+        document.getElementById("sentenceMessage").textContent = "";
+        return;
+      }
+
+      if (sentenceIndex >= availableExercises.length) {
+        sentenceIndex = 0;
+      }
+
+      let exercise = availableExercises[sentenceIndex];
+
+      document.getElementById("sentencePrompt").textContent =
+        "Переведи: " + exercise.prompt;
+
+      document.getElementById("selectedSentence").textContent = "";
+
+      let wordBank = document.getElementById("wordBank");
+      wordBank.innerHTML = "";
+
+      for (let i = 0; i < exercise.bank.length; i = i + 1) {
+        let button = document.createElement("button");
+        button.className = "word-token";
+        button.textContent = exercise.bank[i];
+
+        button.onclick = function() {
+          selectedSentenceWords.push(exercise.bank[i]);
+
+          document.getElementById("selectedSentence").textContent =
+            selectedSentenceWords.join("");
+        };
+
+        wordBank.appendChild(button);
+      }
+
+      document.getElementById("sentenceMessage").textContent = "";
+      document.getElementById("sentenceMessage").className = "message";
+    }
+
+    function checkSentence() {
+      let availableExercises = getAvailableSentenceExercises();
+
+      if (availableExercises.length === 0) {
+        return;
+      }
+
+      let exercise = availableExercises[sentenceIndex];
+
+      let userAnswer = selectedSentenceWords.join("");
+      let correctAnswer = exercise.correct.join("");
+
+      if (userAnswer === correctAnswer) {
+        sentenceCorrectCount = sentenceCorrectCount + 1;
+
+        document.getElementById("sentenceMessage").className = "message";
+        document.getElementById("sentenceMessage").textContent =
+          "Правильно: " + correctAnswer + ". " + exercise.explanation;
+      } else {
+        sentenceWrongCount = sentenceWrongCount + 1;
+
+        document.getElementById("sentenceMessage").className = "error-message";
+        document.getElementById("sentenceMessage").textContent =
+          "Неправильно. Правильно: " + correctAnswer + ". " + exercise.explanation;
+      }
+
+      saveSentenceProgress();
+      updateSentenceProgress();
+    }
+
+    function clearSentence() {
+      selectedSentenceWords = [];
+      document.getElementById("selectedSentence").textContent = "";
+      document.getElementById("sentenceMessage").textContent = "";
+      document.getElementById("sentenceMessage").className = "message";
+    }
+
+    function nextSentenceExercise() {
+      let availableExercises = getAvailableSentenceExercises();
+
+      if (availableExercises.length === 0) {
+        renderSentenceExercise();
+        return;
+      }
+
+      sentenceIndex = sentenceIndex + 1;
+
+      if (sentenceIndex >= availableExercises.length) {
+        sentenceIndex = 0;
+      }
+
+      renderSentenceExercise();
+    }
+
+    function updateSentenceProgress() {
+      document.getElementById("sentenceProgress").textContent =
+        "Предложения | Правильно: " + sentenceCorrectCount +
+        " | Ошибки: " + sentenceWrongCount;
+    }
+
+    // =========================
+    // Запуск приложения
+    // =========================
+
+    showCard();
+    renderWordList();
+    renderWritingWord();
+    renderSentenceExercise();
+  </script>
+
+</body>
+</html>
