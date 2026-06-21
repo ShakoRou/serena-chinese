@@ -417,3 +417,14 @@ input, select {
 #hanziTarget {
   overflow: hidden;
 }
+#hanziTarget,
+#hanziTarget svg,
+.hanzi-box {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#hanziTarget {
+  overflow: hidden;
+}
