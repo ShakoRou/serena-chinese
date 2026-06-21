@@ -286,6 +286,47 @@
       text-align: center;
     }
 
+    .status-select {
+      width: 100%;
+      max-width: 260px;
+      margin-top: 10px;
+      background: #f3edff;
+      color: #3c266d;
+      font-weight: bold;
+    }
+
+    .custom-phrase-panel {
+      margin-top: 18px;
+      padding: 14px;
+      border-radius: 16px;
+      background: #faf7ff;
+      border: 1px solid #e0d2ff;
+      text-align: left;
+    }
+
+    .custom-phrase-panel summary {
+      cursor: pointer;
+      font-weight: bold;
+      color: #5a3fa0;
+      margin-bottom: 10px;
+    }
+
+    .sentence-message-success {
+      color: #1f7a4d;
+      background: #e9f8f0;
+      border: 1px solid #86d3aa;
+      border-radius: 14px;
+      padding: 10px;
+    }
+
+    .sentence-message-error {
+      color: #9b1c1c;
+      background: #ffe8e8;
+      border: 1px solid #e78b8b;
+      border-radius: 14px;
+      padding: 10px;
+    }
+
     .sentence-bank,
     .sentence-answer {
       min-height: 55px;
@@ -545,6 +586,7 @@
 
     const PROGRESS_KEY = "serenaChineseProgressV2";
     const CUSTOM_WORDS_KEY = "serenaChineseCustomWordsV2";
+    const CUSTOM_PHRASES_KEY = "serenaChineseCustomPhrasesV2";
     const LESSON_KEY = "serenaChineseCurrentLessonV2";
 
     // =====================================================
@@ -565,6 +607,7 @@
     // какая вкладка открыта, какой номер карточки, какой урок.
 
     let customWords = loadJSON(CUSTOM_WORDS_KEY, []);
+    let customPhrases = loadJSON(CUSTOM_PHRASES_KEY, []);
     let progress = loadJSON(PROGRESS_KEY, {});
     let lesson = loadJSON(LESSON_KEY, null);
 
@@ -723,6 +766,10 @@
       }
     ];
 
+    function getAllPhrases() {
+      return [...phraseBank, ...customPhrases];
+    }
+
     // =====================================================
     // 5. STORAGE FUNCTIONS — загрузка и сохранение
     // =====================================================
@@ -754,6 +801,10 @@
 
     function saveCustomWords() {
       saveJSON(CUSTOM_WORDS_KEY, customWords);
+    }
+
+    function saveCustomPhrases() {
+      saveJSON(CUSTOM_PHRASES_KEY, customPhrases);
     }
 
     function saveLesson() {
@@ -971,6 +1022,11 @@
       return getAllWords().find(word => word.id === id);
     }
 
+    function getWordByChinese(chinese) {
+      const key = normalizeChinese(chinese);
+      return getAllWords().find(word => normalizeChinese(word.chinese) === key);
+    }
+
     function getProgress(wordId) {
       if (!progress[wordId]) {
         progress[wordId] = {
@@ -1022,6 +1078,20 @@
 
     function getStatusLabel(status) {
       return STATUS_LABELS[status] || status;
+    }
+
+    function getStatusOptions(currentStatus) {
+      const statuses = ["new", "learning", "review", "learned"];
+
+      return statuses.map(status => {
+        const selected = status === currentStatus ? "selected" : "";
+        return `<option value="${status}" ${selected}>${getStatusLabel(status)}</option>`;
+      }).join("");
+    }
+
+    // Старое имя оставляем как мостик, чтобы не ломались старые кнопки.
+    function moveWordToStatus(wordId, newStatus) {
+      setWordStatus(wordId, newStatus);
     }
 
     function setWordStatus(wordId, newStatus) {
@@ -1554,7 +1624,7 @@
     }
 
     function getAvailableSentences() {
-      return phraseBank.filter(phrase => {
+      const available = getAllPhrases().filter(phrase => {
         const wordIds = getPhraseWordIds(phrase);
 
         const existingWordIds = wordIds.filter(wordId => {
@@ -1581,6 +1651,12 @@
         // и не слишком много новых слов.
         return knownCount >= 1 && newCount <= 2;
       });
+
+      // Пользовательские фразы показываем чаще: добавляем их в список ещё раз.
+      // Это не создаёт дубль в памяти, а только увеличивает шанс встретить фразу.
+      const favoriteCustomPhrases = available.filter(phrase => phrase.isCustom);
+
+      return [...available, ...favoriteCustomPhrases];
     }
 
     function renderPhraseTokens(phrase) {
@@ -1638,12 +1714,10 @@
             status: <strong>${item.status}</strong><br>
             mastery: <strong>${item.mastery}/5</strong>
           </p>
-          <div class="button-row">
-            <button class="secondary" onclick="moveWordToStatus('${word.id}', 'new')">В новые</button>
-            <button class="secondary" onclick="moveWordToStatus('${word.id}', 'learning')">В изучение</button>
-            <button class="warning" onclick="moveWordToStatus('${word.id}', 'review')">В повторение</button>
-            <button class="success" onclick="moveWordToStatus('${word.id}', 'learned')">В выученные</button>
-          </div>
+          <p class="small-note">Переместить слово в другой блок:</p>
+          <select class="status-select" onchange="setWordStatus('${word.id}', this.value)">
+            ${getStatusOptions(item.status)}
+          </select>
         </div>
       `;
     }
@@ -1698,12 +1772,26 @@
         <div class="sentence-bank" id="sentenceBank"></div>
 
         <div class="button-row">
-          <button class="success" onclick="checkSentence()">Проверить</button>
           <button class="secondary" onclick="clearSentence()">Очистить</button>
-          <button onclick="nextSentence()">Следующая фраза</button>
+          <button onclick="checkSentenceAndGoNext()">Следующая фраза</button>
         </div>
 
         <div id="sentenceMessage" class="message"></div>
+
+        <details class="custom-phrase-panel">
+          <summary>Добавить свою фразу</summary>
+          <p class="small-note">
+            Вводи китайские слова через пробел, чтобы приложение могло найти их в dictionary.js.<br>
+            Например: 我 喜欢 喝 茶
+          </p>
+          <input id="customPhraseChinese" placeholder="Китайская фраза словами через пробел">
+          <input id="customPhraseTranslation" placeholder="Перевод фразы">
+          <input id="customPhraseExplanation" placeholder="Короткое объяснение, необязательно">
+          <div class="button-row">
+            <button onclick="addCustomPhrase()">Добавить фразу</button>
+          </div>
+          <div id="customPhraseMessage" class="message"></div>
+        </details>
       `;
 
       const bank = document.getElementById("sentenceBank");
@@ -1724,13 +1812,16 @@
       const availableSentences = getAvailableSentences();
       const phrase = availableSentences[currentSentenceIndex];
 
-      if (!phrase) return;
+      if (!phrase) return false;
 
       const userAnswer = chosenSentenceWords.join("");
       const correctAnswer = getPhraseCorrectAnswer(phrase);
       const message = document.getElementById("sentenceMessage");
 
+      if (!message) return false;
+
       if (userAnswer === correctAnswer) {
+        message.className = "message sentence-message-success";
         message.innerHTML = `Правильно. ${phrase.explanation}`;
 
         getPhraseWordIds(phrase).forEach(wordId => {
@@ -1742,18 +1833,107 @@
 
         saveProgress();
         renderStats();
-      } else {
-        message.innerHTML = `Пока неправильно. Правильный ответ: ${correctAnswer}. ${phrase.explanation}`;
-
-        getPhraseWordIds(phrase).forEach(wordId => {
-          const item = getProgress(wordId);
-          item.wrongCount++;
-          item.status = "review";
-        });
-
-        saveProgress();
-        renderStats();
+        return true;
       }
+
+      message.className = "message sentence-message-error";
+      message.innerHTML = `Пока неправильно. Правильный ответ: ${correctAnswer}. ${phrase.explanation}`;
+
+      getPhraseWordIds(phrase).forEach(wordId => {
+        const item = getProgress(wordId);
+        item.wrongCount++;
+        item.status = "review";
+      });
+
+      saveProgress();
+      renderStats();
+      return false;
+    }
+
+    function checkSentenceAndGoNext() {
+      if (chosenSentenceWords.length === 0) {
+        nextSentence();
+        return;
+      }
+
+      const isCorrect = checkSentence();
+
+      if (!isCorrect) {
+        return;
+      }
+
+      setTimeout(() => {
+        nextSentence();
+      }, 650);
+    }
+
+    function splitPhraseInput(text) {
+      return String(text || "")
+        .replace(/[。！？?!,.，]/g, " ")
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+    }
+
+    function addCustomPhrase() {
+      const phraseInput = document.getElementById("customPhraseChinese");
+      const translationInput = document.getElementById("customPhraseTranslation");
+      const explanationInput = document.getElementById("customPhraseExplanation");
+      const message = document.getElementById("customPhraseMessage");
+
+      if (!phraseInput || !translationInput || !explanationInput || !message) {
+        return;
+      }
+
+      const parts = splitPhraseInput(phraseInput.value);
+      const translation = translationInput.value.trim();
+      const explanation = explanationInput.value.trim();
+
+      if (parts.length < 2 || !translation) {
+        message.className = "message sentence-message-error";
+        message.textContent = "Добавь минимум два китайских слова через пробел и перевод.";
+        return;
+      }
+
+      const unknownParts = [];
+      const words = [];
+
+      parts.forEach(part => {
+        const word = getWordByChinese(part);
+
+        if (word) {
+          words.push(word);
+        } else {
+          unknownParts.push(part);
+        }
+      });
+
+      if (unknownParts.length > 0) {
+        message.className = "message sentence-message-error";
+        message.textContent = `Эти слова не найдены в словаре: ${unknownParts.join(", ")}. Сначала добавь их в dictionary.js или как личные слова.`;
+        return;
+      }
+
+      const phrase = {
+        id: "custom_phrase_" + Date.now(),
+        isCustom: true,
+        translation,
+        tokens: words.map(word => ({ wordId: word.id })).concat([{ text: "。" }]),
+        bank: shuffle(words.map(word => word.chinese)),
+        explanation: explanation || "Пользовательская фраза. Нажми на слова, чтобы увидеть pinyin, перевод и тип."
+      };
+
+      customPhrases.push(phrase);
+      saveCustomPhrases();
+
+      phraseInput.value = "";
+      translationInput.value = "";
+      explanationInput.value = "";
+
+      message.className = "message sentence-message-success";
+      message.textContent = "Фраза добавлена и будет встречаться чаще.";
+
+      renderAll();
     }
 
     function clearSentence() {
@@ -1886,10 +2066,9 @@
             </span>
 
             <div class="dictionary-actions">
-              <button class="secondary" onclick="setWordStatus('${word.id}', 'new')">В новые</button>
-              <button class="secondary" onclick="setWordStatus('${word.id}', 'learning')">В изучение</button>
-              <button class="warning" onclick="setWordStatus('${word.id}', 'review')">В повторение</button>
-              <button class="success" onclick="setWordStatus('${word.id}', 'learned')">В выученные</button>
+              <select class="status-select" onchange="setWordStatus('${word.id}', this.value)">
+                ${getStatusOptions(item.status)}
+              </select>
             </div>
           </div>
         `;
@@ -1912,10 +2091,12 @@
 
       localStorage.removeItem(PROGRESS_KEY);
       localStorage.removeItem(CUSTOM_WORDS_KEY);
+      localStorage.removeItem(CUSTOM_PHRASES_KEY);
       localStorage.removeItem(LESSON_KEY);
 
       progress = {};
       customWords = [];
+      customPhrases = [];
       lesson = null;
 
       currentCardIndex = 0;
