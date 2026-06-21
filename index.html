@@ -125,6 +125,13 @@
       background: #f3edff;
       border-radius: 16px;
       padding: 12px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(70, 45, 110, 0.12);
     }
 
     .stat-number {
@@ -285,8 +292,45 @@
     }
 
     .dictionary-item {
-      padding: 8px;
+      padding: 12px 8px;
       border-bottom: 1px solid #e2d6fa;
+    }
+
+    .dictionary-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .dictionary-actions button,
+    .filter-button {
+      padding: 7px 10px;
+      font-size: 13px;
+      border-radius: 10px;
+    }
+
+    .filter-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      margin: 12px 0;
+    }
+
+    .filter-button.active {
+      background: #2e1b5f;
+      color: white;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: #efe6ff;
+      color: #3c266d;
+      font-size: 13px;
+      margin-left: 4px;
     }
 
     .small-note {
@@ -344,19 +388,19 @@
       <div id="lessonInfo" class="small-note"></div>
 
       <div class="stats">
-        <div class="stat-card">
+        <div class="stat-card" onclick="openDictionaryStatus('new')" title="Открыть новые слова">
           <div class="stat-number" id="newCount">0</div>
           <div>новые</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" onclick="openDictionaryStatus('learning')" title="Открыть слова в изучении">
           <div class="stat-number" id="learningCount">0</div>
           <div>изучаются</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" onclick="openDictionaryStatus('review')" title="Открыть слова на повторение">
           <div class="stat-number" id="reviewCount">0</div>
           <div>повторить</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" onclick="openDictionaryStatus('learned')" title="Открыть выученные слова">
           <div class="stat-number" id="learnedCount">0</div>
           <div>выучены</div>
         </div>
@@ -466,6 +510,10 @@
     let currentSentenceIndex = 0;
     let cardAnswerVisible = false;
     let chosenSentenceWords = [];
+
+    // Фильтр для экрана “Словарь”.
+    // Он показывает: все слова, новые, изучаются, повторить или выученные.
+    let currentDictionaryFilter = "all";
 
     // =====================================================
     // 4. SENTENCE BANK — база упражнений с предложениями
@@ -803,6 +851,85 @@
       } else {
         item.status = "learned";
       }
+    }
+
+
+    // =====================================================
+    // 8.1 PROGRESS MANAGER — ручное управление статусом слова
+    // =====================================================
+    //
+    // Этот блок позволяет вручную перемещать слово между состояниями:
+    // new, learning, review, learned.
+    //
+    // Это нужно, если приложение считает слово выученным,
+    // но человек чувствует: “нет, я ещё плохо его знаю”.
+
+    const STATUS_LABELS = {
+      all: "все",
+      new: "новые",
+      learning: "изучаются",
+      review: "повторить",
+      learned: "выучены"
+    };
+
+    function getStatusLabel(status) {
+      return STATUS_LABELS[status] || status;
+    }
+
+    function setWordStatus(wordId, newStatus) {
+      const item = getProgress(wordId);
+
+      if (newStatus === "new") {
+        item.status = "new";
+        item.mastery = 0;
+        item.cardDone = false;
+        item.writingDone = false;
+        item.sentenceDone = false;
+      }
+
+      if (newStatus === "learning") {
+        item.status = "learning";
+        item.mastery = Math.max(1, item.mastery || 1);
+        item.cardDone = true;
+      }
+
+      if (newStatus === "review") {
+        item.status = "review";
+        item.mastery = Math.max(3, item.mastery || 3);
+        item.cardDone = true;
+      }
+
+      if (newStatus === "learned") {
+        item.status = "learned";
+        item.mastery = 5;
+        item.cardDone = true;
+        item.writingDone = true;
+        item.sentenceDone = true;
+      }
+
+      saveProgress();
+      renderAll();
+    }
+
+    function openDictionaryStatus(status) {
+      currentDictionaryFilter = status;
+      showMode("dictionary");
+    }
+
+    function setDictionaryFilter(status) {
+      currentDictionaryFilter = status;
+      renderDictionary();
+    }
+
+    function getFilteredDictionaryWords(words) {
+      if (currentDictionaryFilter === "all") {
+        return words;
+      }
+
+      return words.filter(word => {
+        const item = getProgress(word.id);
+        return item.status === currentDictionaryFilter;
+      });
     }
 
     // =====================================================
@@ -1424,10 +1551,53 @@
     function renderDictionary() {
       const list = document.getElementById("dictionaryList");
       const allWords = getAllWords();
+      const filteredWords = getFilteredDictionaryWords(allWords);
 
       const warningsHTML = renderDictionaryWarnings();
+      const filtersHTML = renderDictionaryFilters(allWords);
+      const wordsHTML = renderDictionaryWordList(filteredWords);
 
-      const wordsHTML = allWords.map(word => {
+      list.innerHTML = warningsHTML + filtersHTML + wordsHTML;
+    }
+
+    function renderDictionaryFilters(allWords) {
+      const filters = ["all", "new", "learning", "review", "learned"];
+
+      const buttons = filters.map(status => {
+        const count = status === "all"
+          ? allWords.length
+          : allWords.filter(word => getProgress(word.id).status === status).length;
+
+        const activeClass = currentDictionaryFilter === status ? "active" : "secondary";
+
+        return `
+          <button class="filter-button ${activeClass}" onclick="setDictionaryFilter('${status}')">
+            ${getStatusLabel(status)}: ${count}
+          </button>
+        `;
+      }).join("");
+
+      return `
+        <div class="filter-row">
+          ${buttons}
+        </div>
+        <p class="small-note">
+          Сейчас показан раздел: <strong>${getStatusLabel(currentDictionaryFilter)}</strong>.
+          Здесь можно вручную перемещать слова между блоками прогресса.
+        </p>
+      `;
+    }
+
+    function renderDictionaryWordList(words) {
+      if (words.length === 0) {
+        return `
+          <div class="dictionary-item">
+            В этом разделе пока нет слов.
+          </div>
+        `;
+      }
+
+      return words.map(word => {
         const item = getProgress(word.id);
 
         return `
@@ -1435,18 +1605,23 @@
             <strong>${word.chinese}</strong>
             — ${word.pinyin}
             — ${word.meaning}
+            <span class="status-badge">${getStatusLabel(item.status)}</span>
             <br>
             <span class="small-note">
               id: ${word.id},
               type: ${word.type},
-              status: ${item.status},
               mastery: ${item.mastery}/5
             </span>
+
+            <div class="dictionary-actions">
+              <button class="secondary" onclick="setWordStatus('${word.id}', 'new')">В новые</button>
+              <button class="secondary" onclick="setWordStatus('${word.id}', 'learning')">В изучение</button>
+              <button class="warning" onclick="setWordStatus('${word.id}', 'review')">В повторение</button>
+              <button class="success" onclick="setWordStatus('${word.id}', 'learned')">В выученные</button>
+            </div>
           </div>
         `;
       }).join("");
-
-      list.innerHTML = warningsHTML + wordsHTML;
     }
 
     // =====================================================
