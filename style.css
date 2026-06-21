@@ -167,11 +167,13 @@ textarea { min-height: 82px; resize: vertical; }
   font-weight: 800;
   color: #40216f;
   margin-bottom: 10px;
+  text-align: center;
 }
 
 .character-picker {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 10px;
   margin: 14px 0;
 }
@@ -211,6 +213,37 @@ textarea { min-height: 82px; resize: vertical; }
 #hanziTarget {
   width: 360px;
   height: 360px;
+}
+
+.word-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.write-shortcut-button {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  border: 2px solid #e2d5ff;
+  background: #ffffff;
+  color: #4a247f;
+  font-size: 22px;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 0;
+  box-shadow: 0 8px 18px rgba(83, 42, 143, 0.12);
+}
+
+.write-shortcut-button:hover {
+  background: #f4edff;
+  transform: translateY(-1px);
+}
+
+.write-shortcut-button:active {
+  transform: translateY(0);
 }
 
 @media (max-width: 480px) {
