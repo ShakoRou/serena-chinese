@@ -1,0 +1,315 @@
+/* =====================================================
+   Serena Chinese — style.css
+   Этот файл отвечает только за внешний вид приложения.
+   ===================================================== */
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: linear-gradient(135deg, #f5edff, #fff8ef);
+  color: #251a38;
+}
+
+.app-shell {
+  width: min(1100px, 94vw);
+  margin: 0 auto;
+  padding: 24px 0 48px;
+}
+
+.hero {
+  background: #2f1b59;
+  color: white;
+  border-radius: 28px;
+  padding: 28px;
+  box-shadow: 0 18px 45px rgba(47, 27, 89, 0.22);
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  opacity: 0.8;
+  font-size: 13px;
+}
+
+h1, h2, h3 { margin-top: 0; }
+
+.hero h1 {
+  font-size: clamp(28px, 5vw, 52px);
+  margin-bottom: 12px;
+}
+
+.hero-text { max-width: 760px; line-height: 1.6; }
+
+.panel {
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(88, 55, 139, 0.14);
+  border-radius: 24px;
+  padding: 20px;
+  margin-top: 18px;
+  box-shadow: 0 12px 35px rgba(47, 27, 89, 0.08);
+}
+
+.button-row, .filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin: 12px 0;
+}
+
+button, select, input, textarea {
+  font: inherit;
+}
+
+button {
+  border: none;
+  border-radius: 14px;
+  padding: 11px 16px;
+  background: #6f3fd8;
+  color: white;
+  cursor: pointer;
+  font-weight: 700;
+  box-shadow: 0 8px 18px rgba(111, 63, 216, 0.22);
+}
+
+button:hover { transform: translateY(-1px); }
+button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+button.secondary { background: #eee6ff; color: #3b236c; box-shadow: none; }
+button.danger { background: #d84545; }
+
+input, textarea, select {
+  width: 100%;
+  border: 1px solid #ddd0f6;
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin: 8px 0;
+  background: white;
+  color: #251a38;
+}
+
+textarea { min-height: 82px; resize: vertical; }
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.stat-card {
+  background: #fbf7ff;
+  border: 1px solid #eadcff;
+  border-radius: 20px;
+  padding: 16px;
+  cursor: pointer;
+}
+
+.stat-number {
+  font-size: 30px;
+  font-weight: 800;
+  color: #5a2fc4;
+}
+
+.stat-label { color: #6f6083; margin-top: 4px; }
+
+.tabs {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+
+.tabs button {
+  background: #ffffff;
+  color: #4a2b7d;
+  box-shadow: none;
+  border: 1px solid #e4d7fa;
+}
+
+.tabs button.active {
+  background: #2f1b59;
+  color: white;
+}
+
+.hidden { display: none !important; }
+.muted { color: #6d617d; line-height: 1.55; }
+
+.card-box {
+  min-height: 240px;
+  display: grid;
+  place-items: center;
+}
+
+.study-card {
+  width: min(520px, 100%);
+  background: #fff;
+  border-radius: 24px;
+  padding: 28px;
+  text-align: center;
+  border: 1px solid #eadcff;
+}
+
+.chinese-big {
+  font-size: clamp(50px, 12vw, 92px);
+  line-height: 1.1;
+  margin: 10px 0;
+}
+
+.pinyin { font-size: 22px; color: #6f3fd8; font-weight: 700; }
+.meaning { font-size: 20px; margin-top: 8px; }
+.meta { color: #6d617d; font-size: 14px; }
+
+#writingCanvas {
+  display: block;
+  width: min(320px, 100%);
+  height: 320px;
+  background: white;
+  border: 2px dashed #c9b5ef;
+  border-radius: 20px;
+  touch-action: none;
+  margin: 14px 0;
+}
+
+.writing-word { font-size: 32px; font-weight: 800; color: #40216f; }
+
+.phrase-source {
+  display: inline-block;
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: #efe6ff;
+  color: #4b2a85;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.phrase-text {
+  font-size: clamp(28px, 6vw, 52px);
+  line-height: 1.5;
+  margin: 14px 0;
+}
+
+.phrase-token {
+  display: inline-block;
+  padding: 6px 10px;
+  margin: 4px;
+  border-radius: 14px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.phrase-token.new-word {
+  background: #fff0b8;
+  border-color: #e2a321;
+  color: #714300;
+}
+
+.phrase-token.learning {
+  background: #efe6ff;
+  color: #48277f;
+}
+
+.phrase-token.review {
+  background: #ffe0c2;
+  color: #733a00;
+}
+
+.phrase-token.learned {
+  background: #dcf7e6;
+  color: #176039;
+}
+
+.word-info-card {
+  background: #fff;
+  border: 1px solid #eadcff;
+  border-radius: 20px;
+  padding: 16px;
+  margin: 12px 0;
+}
+
+.sentence-prompt {
+  font-weight: 800;
+  color: #3b236c;
+  margin: 16px 0 10px;
+}
+
+.sentence-build, .word-bank {
+  min-height: 62px;
+  border-radius: 18px;
+  padding: 12px;
+  margin: 12px 0;
+}
+
+.sentence-build {
+  background: #f9f4ff;
+  border: 1px dashed #bfa7e8;
+}
+
+.word-bank { background: #fff; border: 1px solid #eadcff; }
+
+.word-chip {
+  display: inline-block;
+  margin: 5px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: #6f3fd8;
+  color: white;
+  cursor: pointer;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.word-chip.selected { background: #d7c6f5; color: #4a2b7d; }
+
+.message {
+  min-height: 24px;
+  margin-top: 10px;
+  font-weight: 700;
+}
+
+.message.ok { color: #21824a; }
+.message.error { color: #cc3030; }
+
+.dictionary-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.word-row {
+  background: #fff;
+  border: 1px solid #eadcff;
+  border-radius: 18px;
+  padding: 14px;
+}
+
+.word-row .chinese { font-size: 34px; font-weight: 800; }
+.word-row select { margin-top: 10px; }
+
+.warning-box {
+  background: #fff0f0;
+  border: 1px solid #efb1b1;
+  color: #8b1e1e;
+  border-radius: 16px;
+  padding: 12px;
+  margin: 10px 0;
+}
+
+.add-phrase-box, .add-word-box {
+  margin-top: 18px;
+  padding: 14px;
+  border-radius: 18px;
+  background: #fbf7ff;
+  border: 1px solid #eadcff;
+}
+
+summary { cursor: pointer; font-weight: 800; color: #3b236c; }
+
+@media (max-width: 720px) {
+  .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .panel { padding: 16px; }
+  .tabs button { flex: 1 1 45%; }
+}
