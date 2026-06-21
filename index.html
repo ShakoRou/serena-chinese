@@ -7,6 +7,7 @@
   <title>Serena Chinese</title>
 
   <script src="dictionary.js"></script>
+  <script src="phrases.js"></script>
 
   <style>
     /* =====================================================
@@ -635,136 +636,7 @@
     // translation — перевод всей фразы.
     // explanation — короткое грамматическое объяснение.
 
-    const phraseBank = [
-      {
-        id: "p1",
-        translation: "Я люблю пить чай.",
-        tokens: [
-          { wordId: "wo" },
-          { wordId: "xihuan" },
-          { wordId: "he" },
-          { wordId: "cha" },
-          { text: "。" }
-        ],
-        bank: ["茶", "我", "喜欢", "喝"],
-        explanation: "我 = я, 喜欢 = нравится/любить, 喝 = пить, 茶 = чай."
-      },
-      {
-        id: "p2",
-        translation: "Ты хочешь пить воду?",
-        tokens: [
-          { wordId: "ni" },
-          { wordId: "yao" },
-          { wordId: "he" },
-          { wordId: "shui" },
-          { wordId: "ma" },
-          { text: "？" }
-        ],
-        bank: ["水", "你", "吗", "要", "喝"],
-        explanation: "吗 в конце делает предложение вопросом. 要 может значить “хотеть” или “нужно”."
-      },
-      {
-        id: "p3",
-        translation: "Он не ест рис / еду.",
-        tokens: [
-          { wordId: "ta_male" },
-          { wordId: "bu" },
-          { wordId: "chi" },
-          { wordId: "fan" },
-          { text: "。" }
-        ],
-        bank: ["吃", "他", "饭", "不"],
-        explanation: "不 ставится перед глаголом: 不吃 = не есть."
-      },
-      {
-        id: "p4",
-        translation: "Сейчас я иду в школу.",
-        tokens: [
-          { wordId: "xianzai" },
-          { wordId: "wo" },
-          { wordId: "qu" },
-          { wordId: "xuexiao" },
-          { text: "。" }
-        ],
-        bank: ["学校", "现在", "去", "我"],
-        explanation: "现在 можно поставить в начале: сейчас + кто + действие + место."
-      },
-      {
-        id: "p5",
-        translation: "Мама пьёт кофе.",
-        tokens: [
-          { wordId: "mama" },
-          { wordId: "he" },
-          { wordId: "kafei" },
-          { text: "。" }
-        ],
-        bank: ["咖啡", "妈妈", "喝"],
-        explanation: "Простой порядок: кто + действие + что."
-      },
-      {
-        id: "p6",
-        translation: "Учитель говорит очень медленно.",
-        tokens: [
-          { wordId: "laoshi" },
-          { wordId: "shuo" },
-          { wordId: "hen" },
-          { wordId: "man" },
-          { text: "。" }
-        ],
-        bank: ["慢", "老师", "很", "说"],
-        explanation: "很 часто ставится перед прилагательным: 很慢 = очень медленно."
-      },
-      {
-        id: "p7",
-        translation: "Я хочу купить кофе.",
-        tokens: [
-          { wordId: "wo" },
-          { wordId: "xiang" },
-          { wordId: "mai_buy" },
-          { wordId: "kafei" },
-          { text: "。" }
-        ],
-        bank: ["咖啡", "买", "我", "想"],
-        explanation: "想 + глагол = хотеть что-то сделать."
-      },
-      {
-        id: "p8",
-        translation: "Ты умеешь писать?",
-        tokens: [
-          { wordId: "ni" },
-          { wordId: "hui_can" },
-          { wordId: "xie" },
-          { wordId: "ma" },
-          { text: "？" }
-        ],
-        bank: ["写", "会", "吗", "你"],
-        explanation: "会 + глагол часто значит “уметь что-то делать”."
-      },
-      {
-        id: "p9",
-        translation: "Мы все учимся / читаем.",
-        tokens: [
-          { wordId: "women" },
-          { wordId: "dou" },
-          { wordId: "du" },
-          { text: "。" }
-        ],
-        bank: ["读", "都", "我们"],
-        explanation: "都 означает “все”: 我们都 = мы все."
-      },
-      {
-        id: "p10",
-        translation: "Я возвращаюсь домой.",
-        tokens: [
-          { wordId: "wo" },
-          { wordId: "hui_return" },
-          { wordId: "jia" },
-          { text: "。" }
-        ],
-        bank: ["家", "回", "我"],
-        explanation: "回家 = возвращаться домой."
-      }
-    ];
+    const phraseBank = window.SERENA_PHRASES || [];
 
     function getAllPhrases() {
       return [...phraseBank, ...customPhrases];
