@@ -7,115 +7,130 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="app-shell">
-    <header class="hero">
+  <main class="app-shell">
+    <header class="hero panel">
       <div>
         <p class="eyebrow">Serena Chinese</p>
-        <h1>Учить китайский по словам, письму и фразам</h1>
-        <p class="hero-text">Слова живут в <strong>dictionary.js</strong>, фразы — в <strong>phrases.js</strong>, внешний вид — в <strong>style.css</strong>, логика — в <strong>app.js</strong>.</p>
+        <h1>Учить китайский по-своему</h1>
+        <p class="muted">
+          Карточки, письмо иероглифов, фразы, словарь и личный прогресс.
+        </p>
       </div>
-    </header>
-
-    <section class="panel controls-panel">
-      <div class="button-row">
+      <div class="hero-buttons">
         <button onclick="startNewLesson()">Новый урок: 10 слов</button>
         <button class="secondary" onclick="continueLesson()">Продолжить урок</button>
         <button class="danger" onclick="resetProgress()">Сбросить прогресс</button>
       </div>
-      <div id="statsGrid" class="stats-grid"></div>
-    </section>
+    </header>
 
-    <nav class="tabs">
+    <section id="statsGrid" class="stats-grid"></section>
+
+    <nav class="tabs panel">
       <button id="tab-cards" onclick="showMode('cards')">Учить слова</button>
       <button id="tab-writing" onclick="showMode('writing')">Писать иероглифы</button>
       <button id="tab-sentences" onclick="showMode('sentences')">Строить предложения</button>
       <button id="tab-dictionary" onclick="showMode('dictionary')">Словарь</button>
     </nav>
 
-    <main>
-      <section id="cardsMode" class="mode-section panel">
-        <h2>Учить слова</h2>
-        <p class="muted">Нажми “Новый урок”, чтобы взять 10 слов: часть новых, часть на повторение.</p>
-        <div id="cardBox" class="card-box"></div>
-      </section>
+    <section id="cardsMode" class="mode-section panel">
+      <h2>Учить слова</h2>
+      <div id="cardBox"></div>
+    </section>
 
-      <section id="writingMode" class="mode-section panel hidden">
-        <h2>Писать иероглифы</h2>
-        <p class="muted">Тренируй руку. Это пока свободное поле для письма.</p>
-        <div id="writingWord" class="writing-word"></div>
-        <canvas id="writingCanvas" width="320" height="320"></canvas>
-        <div class="button-row">
-          <button onclick="clearCanvas()">Очистить</button>
-          <button class="secondary" onclick="markWritingDone()">Я написала</button>
-        </div>
-      </section>
+    <section id="writingMode" class="mode-section panel hidden">
+      <h2>Писать иероглифы</h2>
+      <p class="muted">
+        Тренируй каждый иероглиф отдельно. Если слово состоит из двух иероглифов, например 喜欢, выбери 喜 или 欢.
+      </p>
 
-      <section id="sentencesMode" class="mode-section panel hidden">
-        <h2>Строить предложения</h2>
-        <p class="muted">Фразы берутся из <strong>phrases.js</strong>. Нажимай на слово во фразе, чтобы увидеть pinyin, перевод и статус.</p>
-        <div id="phraseSource" class="phrase-source"></div>
-        <div id="phraseText" class="phrase-text"></div>
-        <div id="wordInfoBox"></div>
-        <div id="sentencePrompt" class="sentence-prompt"></div>
-        <div id="sentenceBuild" class="sentence-build"></div>
-        <div id="wordBank" class="word-bank"></div>
-        <div id="sentenceMessage" class="message"></div>
-        <div class="button-row">
-          <button class="secondary" onclick="clearSentence()">Очистить</button>
-          <button onclick="nextPhraseAction()">Следующая фраза</button>
-        </div>
+      <div id="writingWord" class="writing-word"></div>
+      <div id="writingCharacters" class="character-picker"></div>
 
-        <details class="add-phrase-box">
-          <summary>Добавить свою фразу</summary>
-          <p class="muted">Пиши китайские слова через пробел. Слова уже должны быть в словаре.</p>
-          <input id="customPhraseChinese" placeholder="Например: 我 喜欢 喝 茶">
-          <input id="customPhraseTranslation" placeholder="Перевод: Я люблю пить чай">
-          <textarea id="customPhraseExplanation" placeholder="Короткое объяснение грамматики"></textarea>
-          <button onclick="addCustomPhrase()">Добавить фразу</button>
-          <div id="customPhraseMessage" class="message"></div>
-        </details>
-      </section>
+      <div class="hanzi-box">
+        <div id="hanziTarget"></div>
+      </div>
 
-      <section id="dictionaryMode" class="mode-section panel hidden">
-        <h2>Словарь</h2>
-        <div id="dictionaryWarnings"></div>
-        <div class="filter-row">
-          <button onclick="setDictionaryFilter('all')">Все</button>
-          <button onclick="setDictionaryFilter('new')">Новые</button>
-          <button onclick="setDictionaryFilter('learning')">Изучаются</button>
-          <button onclick="setDictionaryFilter('review')">Повторить</button>
-          <button onclick="setDictionaryFilter('learned')">Выучены</button>
-        </div>
-        <input id="dictionarySearch" placeholder="Найти слово, pinyin или перевод..." oninput="renderDictionary()">
+      <div id="writingMessage" class="message"></div>
 
-        <details class="add-word-box">
-          <summary>Добавить личное слово</summary>
-          <input id="newChinese" placeholder="Иероглифы, например: 猫">
-          <input id="newPinyin" placeholder="Pinyin, например: māo">
-          <input id="newMeaning" placeholder="Перевод, например: кошка">
-          <select id="newType">
-            <option value="noun">noun</option>
-            <option value="verb">verb</option>
-            <option value="pronoun">pronoun</option>
-            <option value="adjective">adjective</option>
-            <option value="adverb">adverb</option>
-            <option value="particle">particle</option>
-            <option value="question_word">question_word</option>
-            <option value="number">number</option>
-            <option value="time">time</option>
-            <option value="phrase">phrase</option>
-          </select>
-          <button onclick="addCustomWord()">Добавить слово</button>
-          <div id="addWordMessage" class="message"></div>
-        </details>
+      <div class="button-row">
+        <button onclick="animateHanzi()">Показать порядок черт</button>
+        <button class="secondary" onclick="startHanziQuiz()">Попробовать самой</button>
+        <button class="secondary" onclick="previousWritingCharacter()">← Предыдущий</button>
+        <button class="secondary" onclick="nextWritingCharacter()">Следующий →</button>
+        <button onclick="markWritingDone()">Я потренировалась</button>
+      </div>
+    </section>
 
-        <div id="dictionaryList" class="dictionary-list"></div>
-      </section>
-    </main>
-  </div>
+    <section id="sentencesMode" class="mode-section panel hidden">
+      <h2>Строить предложения</h2>
+      <p id="phraseSource" class="meta"></p>
+
+      <div id="phraseText" class="phrase-text"></div>
+      <div id="wordInfoBox"></div>
+
+      <h3 id="sentencePrompt"></h3>
+      <div id="sentenceBuild" class="sentence-build"></div>
+      <div id="wordBank" class="word-bank"></div>
+      <div id="sentenceMessage" class="message"></div>
+
+      <div class="button-row">
+        <button class="secondary" onclick="clearSentence()">Очистить</button>
+        <button onclick="nextPhraseAction()">Следующая фраза</button>
+      </div>
+
+      <details class="add-box">
+        <summary>Добавить свою фразу</summary>
+        <p class="muted">Пиши китайские слова через пробел. Например: 我 喜欢 茶</p>
+        <input id="customPhraseChinese" placeholder="我 喜欢 茶">
+        <input id="customPhraseTranslation" placeholder="Перевод фразы">
+        <input id="customPhraseExplanation" placeholder="Короткое объяснение">
+        <button onclick="addCustomPhrase()">Добавить фразу</button>
+        <div id="customPhraseMessage" class="message"></div>
+      </details>
+    </section>
+
+    <section id="dictionaryMode" class="mode-section panel hidden">
+      <h2>Словарь</h2>
+
+      <div class="filter-row">
+        <button class="secondary" onclick="setDictionaryFilter('all')">Все</button>
+        <button class="secondary" onclick="setDictionaryFilter('new')">Новые</button>
+        <button class="secondary" onclick="setDictionaryFilter('learning')">Изучаются</button>
+        <button class="secondary" onclick="setDictionaryFilter('review')">Повторить</button>
+        <button class="secondary" onclick="setDictionaryFilter('learned')">Выучены</button>
+      </div>
+
+      <input id="dictionarySearch" oninput="renderDictionary()" placeholder="Поиск: 我, wo, я, verb...">
+
+      <div id="dictionaryWarnings"></div>
+      <div id="dictionaryList" class="dictionary-list"></div>
+
+      <details class="add-box">
+        <summary>Добавить слово</summary>
+        <input id="newChinese" placeholder="Иероглифы, например: 爱">
+        <input id="newPinyin" placeholder="pinyin, например: ài">
+        <input id="newMeaning" placeholder="перевод, например: любовь / любить">
+        <select id="newType">
+          <option value="noun">noun</option>
+          <option value="verb">verb</option>
+          <option value="pronoun">pronoun</option>
+          <option value="adjective">adjective</option>
+          <option value="adverb">adverb</option>
+          <option value="particle">particle</option>
+          <option value="question_word">question_word</option>
+          <option value="number">number</option>
+          <option value="time">time</option>
+          <option value="phrase">phrase</option>
+        </select>
+        <button onclick="addCustomWord()">Добавить слово</button>
+        <div id="addWordMessage" class="message"></div>
+      </details>
+    </section>
+  </main>
 
   <script src="dictionary.js"></script>
   <script src="phrases.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hanzi-writer@3.5/dist/hanzi-writer.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
