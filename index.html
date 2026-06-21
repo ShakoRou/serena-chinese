@@ -41,26 +41,12 @@
 
       <section id="writingMode" class="mode-section panel hidden">
         <h2>Писать иероглифы</h2>
-        <p class="muted">
-          Тренируй каждый иероглиф отдельно. Если слово состоит из двух иероглифов, например 喜欢, выбери 喜 или 欢.
-        </p>
-
+        <p class="muted">Тренируй руку. Это пока свободное поле для письма.</p>
         <div id="writingWord" class="writing-word"></div>
-
-        <div id="writingCharacters" class="character-picker"></div>
-
-        <div class="hanzi-box">
-          <div id="hanziTarget"></div>
-        </div>
-
-        <div id="writingMessage" class="message"></div>
-
+        <canvas id="writingCanvas" width="320" height="320"></canvas>
         <div class="button-row">
-          <button onclick="animateHanzi()">Показать порядок черт</button>
-          <button class="secondary" onclick="startHanziQuiz()">Попробовать самой</button>
-          <button class="secondary" onclick="previousWritingCharacter()">← Предыдущий</button>
-          <button class="secondary" onclick="nextWritingCharacter()">Следующий →</button>
-          <button onclick="markWritingDone()">Я потренировалась</button>
+          <button onclick="clearCanvas()">Очистить</button>
+          <button class="secondary" onclick="markWritingDone()">Я написала</button>
         </div>
       </section>
 
@@ -130,7 +116,6 @@
 
   <script src="dictionary.js"></script>
   <script src="phrases.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/hanzi-writer@3.5/dist/hanzi-writer.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
