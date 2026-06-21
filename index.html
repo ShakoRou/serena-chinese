@@ -9,6 +9,15 @@
   <script src="dictionary.js"></script>
 
   <style>
+    /* =====================================================
+       CSS: внешний вид приложения
+       =====================================================
+
+       CSS отвечает за красоту: цвета, размеры, отступы,
+       карточки, кнопки, мобильную адаптацию и canvas.
+    */
+
+    /* ---------- Общие настройки страницы ---------- */
     * {
       box-sizing: border-box;
     }
@@ -20,6 +29,8 @@
       color: #1f1633;
       text-align: center;
     }
+
+    /* ---------- Основной контейнер приложения ---------- */
 
     .app {
       max-width: 900px;
@@ -37,6 +48,8 @@
       color: #6b5c83;
     }
 
+    /* ---------- Панели и вкладки ---------- */
+
     .panel {
       background: white;
       border-radius: 22px;
@@ -51,6 +64,8 @@
       gap: 8px;
       margin: 16px 0;
     }
+
+    /* ---------- Кнопки ---------- */
 
     button {
       border: none;
@@ -97,6 +112,8 @@
       display: block;
     }
 
+    /* ---------- Статистика прогресса ---------- */
+
     .stats {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -114,6 +131,8 @@
       font-size: 24px;
       font-weight: bold;
     }
+
+    /* ---------- Карточки слов ---------- */
 
     .card {
       background: #faf7ff;
@@ -163,6 +182,8 @@
       font-size: 15px;
     }
 
+    /* ---------- Блок письма иероглифов ---------- */
+
     .canvas-area {
       display: flex;
       flex-wrap: wrap;
@@ -192,6 +213,8 @@
       touch-action: none;
     }
 
+    /* ---------- Блок построения предложений ---------- */
+
     .sentence-bank,
     .sentence-answer {
       min-height: 55px;
@@ -217,6 +240,28 @@
       margin: 12px 0;
     }
 
+    .dictionary-warning {
+      background: #fff4df;
+      color: #8a4b00;
+      border: 1px solid #f0c36d;
+      border-radius: 16px;
+      padding: 12px;
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
+
+    .dictionary-ok {
+      background: #e9f8f0;
+      color: #1f7a4d;
+      border: 1px solid #86d3aa;
+      border-radius: 16px;
+      padding: 12px;
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
+
+    /* ---------- Форма добавления слов ---------- */
+
     input, select {
       width: 100%;
       max-width: 400px;
@@ -226,6 +271,8 @@
       border-radius: 12px;
       font-size: 16px;
     }
+
+    /* ---------- Список словаря ---------- */
 
     .dictionary-list {
       text-align: left;
@@ -246,6 +293,8 @@
       color: #6b5c83;
       font-size: 14px;
     }
+
+    /* ---------- Адаптация под телефон ---------- */
 
     @media (max-width: 700px) {
       .tabs {
@@ -273,6 +322,14 @@
 </head>
 
 <body>
+  <!-- =====================================================
+       HTML: видимая структура приложения
+       =====================================================
+
+       Здесь находятся кнопки, вкладки и пустые контейнеры.
+       JavaScript позже заполняет эти контейнеры карточками,
+       canvas-досками, предложениями и словарём.
+  -->
   <div class="app">
     <h1>Serena Chinese</h1>
     <p class="subtitle">Карточки → письмо иероглифов → предложения</p>
@@ -357,11 +414,47 @@
   </div>
 
   <script>
+    /* =====================================================
+       JAVASCRIPT: логика приложения
+       =====================================================
+
+       JavaScript отвечает за поведение:
+       - создаёт уроки;
+       - показывает карточки;
+       - сохраняет прогресс;
+       - рисует canvas для иероглифов;
+       - проверяет предложения;
+       - проверяет dictionary.js на дубликаты.
+    */
+
+    // =====================================================
+    // 1. STORAGE KEYS — ключи localStorage
+    // =====================================================
+    //
+    // Эти строки называют “полки” в localStorage.
+    // Если не менять эти имена, прогресс сохраняется даже
+    // после обновления index.html.
+
     const PROGRESS_KEY = "serenaChineseProgressV2";
     const CUSTOM_WORDS_KEY = "serenaChineseCustomWordsV2";
     const LESSON_KEY = "serenaChineseCurrentLessonV2";
 
+    // =====================================================
+    // 2. DATA SOURCES — источники данных
+    // =====================================================
+    //
+    // baseDictionary приходит из файла dictionary.js.
+    // customWords — личные слова, добавленные через интерфейс
+    // только в этом браузере.
+
     const baseDictionary = window.SERENA_DICTIONARY || [];
+
+    // =====================================================
+    // 3. APP STATE — текущее состояние приложения
+    // =====================================================
+    //
+    // Эти переменные описывают, что сейчас происходит:
+    // какая вкладка открыта, какой номер карточки, какой урок.
 
     let customWords = loadJSON(CUSTOM_WORDS_KEY, []);
     let progress = loadJSON(PROGRESS_KEY, {});
@@ -373,6 +466,15 @@
     let currentSentenceIndex = 0;
     let cardAnswerVisible = false;
     let chosenSentenceWords = [];
+
+    // =====================================================
+    // 4. SENTENCE BANK — база упражнений с предложениями
+    // =====================================================
+    //
+    // Это заранее подготовленные упражнения.
+    // required — какие слова нужно знать, чтобы упражнение открылось.
+    // correct — правильный порядок.
+    // bank — слова-кнопки, которые видит пользователь.
 
     const sentenceBank = [
       {
@@ -425,6 +527,13 @@
       }
     ];
 
+    // =====================================================
+    // 5. STORAGE FUNCTIONS — загрузка и сохранение
+    // =====================================================
+    //
+    // Эти функции работают с localStorage.
+    // localStorage хранит прогресс только в этом браузере.
+
     function loadJSON(key, fallback) {
       const text = localStorage.getItem(key);
 
@@ -455,8 +564,159 @@
       saveJSON(LESSON_KEY, lesson);
     }
 
+    // =====================================================
+    // 6. HELPER FUNCTIONS — маленькие помощники
+    // =====================================================
+    //
+    // Вспомогательные функции:
+    // - очищают текст;
+    // - перемешивают массив;
+    // - помогают другим частям кода работать проще.
+
     function normalizeChinese(text) {
       return String(text || "").trim().replace(/\s+/g, "");
+    }
+
+    function normalizeId(text) {
+      return String(text || "").trim().toLowerCase();
+    }
+
+    // =====================================================
+    // 7. DICTIONARY CHECKER — проверка dictionary.js
+    // =====================================================
+    //
+    // Этот блок ищет проблемы в базовом словаре:
+    // - повторяющиеся id;
+    // - повторяющиеся китайские слова;
+    // - пустые важные поля.
+    //
+    // Важно: этот блок НЕ удаляет слова из dictionary.js.
+    // Он только предупреждает нас о проблемах.
+    // Сам файл dictionary.js мы редактируем вручную в GitHub.
+
+    function findDuplicates(dictionary, field, normalizer) {
+      const seen = new Map();
+      const duplicates = [];
+
+      dictionary.forEach((word, index) => {
+        const rawValue = word && word[field];
+        const normalizedValue = normalizer(rawValue);
+
+        if (!normalizedValue) {
+          return;
+        }
+
+        if (seen.has(normalizedValue)) {
+          const firstItem = seen.get(normalizedValue);
+
+          duplicates.push({
+            value: rawValue,
+            normalizedValue,
+            firstIndex: firstItem.index,
+            duplicateIndex: index,
+            firstWord: firstItem.word,
+            duplicateWord: word
+          });
+        } else {
+          seen.set(normalizedValue, {
+            word,
+            index
+          });
+        }
+      });
+
+      return duplicates;
+    }
+
+    function findDictionaryProblems() {
+      const duplicateIds = findDuplicates(
+        baseDictionary,
+        "id",
+        normalizeId
+      );
+
+      const duplicateChinese = findDuplicates(
+        baseDictionary,
+        "chinese",
+        normalizeChinese
+      );
+
+      const missingFields = [];
+
+      baseDictionary.forEach((word, index) => {
+        ["id", "chinese", "pinyin", "meaning"].forEach(field => {
+          const value = String((word && word[field]) || "").trim();
+
+          if (!value) {
+            missingFields.push({
+              index,
+              field,
+              word
+            });
+          }
+        });
+      });
+
+      return {
+        duplicateIds,
+        duplicateChinese,
+        missingFields
+      };
+    }
+
+    function renderDictionaryWarnings() {
+      const problems = findDictionaryProblems();
+
+      const hasNoProblems =
+        problems.duplicateIds.length === 0 &&
+        problems.duplicateChinese.length === 0 &&
+        problems.missingFields.length === 0;
+
+      if (hasNoProblems) {
+        return `
+          <div class="dictionary-ok">
+            Словарь чистый: дубликаты и пустые поля не найдены.
+          </div>
+        `;
+      }
+
+      const duplicateIdText = problems.duplicateIds.length > 0
+        ? problems.duplicateIds.map(item => {
+            return `${item.normalizedValue} — слова №${item.firstIndex + 1} и №${item.duplicateIndex + 1}`;
+          }).join("<br>")
+        : "нет";
+
+      const duplicateChineseText = problems.duplicateChinese.length > 0
+        ? problems.duplicateChinese.map(item => {
+            return `${item.normalizedValue} — слова №${item.firstIndex + 1} и №${item.duplicateIndex + 1}`;
+          }).join("<br>")
+        : "нет";
+
+      const missingFieldsText = problems.missingFields.length > 0
+        ? problems.missingFields.map(item => {
+            return `слово №${item.index + 1}: нет поля ${item.field}`;
+          }).join("<br>")
+        : "нет";
+
+      return `
+        <div class="dictionary-warning">
+          <strong>В dictionary.js есть проблемы.</strong><br><br>
+
+          <strong>Повторяющиеся id:</strong><br>
+          ${duplicateIdText}<br><br>
+
+          <strong>Повторяющиеся китайские слова:</strong><br>
+          ${duplicateChineseText}<br><br>
+
+          <strong>Пустые поля:</strong><br>
+          ${missingFieldsText}<br><br>
+
+          <span class="small-note">
+            Приложение продолжит работать и будет использовать только первые варианты дублей.
+            Но лучше позже почистить dictionary.js вручную в GitHub.
+          </span>
+        </div>
+      `;
     }
 
     function shuffle(array) {
@@ -470,18 +730,42 @@
       return copy;
     }
 
+    // =====================================================
+    // 8. WORD FUNCTIONS — работа со словами и прогрессом
+    // =====================================================
+    //
+    // Эти функции соединяют dictionary.js, личные слова
+    // и progress из localStorage.
+    //
+    // Важная защита: если в dictionary.js случайно есть дубли,
+    // приложение берёт только первый вариант, чтобы уроки
+    // не ломались и прогресс не путался.
+
     function getAllWords() {
       const all = [...baseDictionary, ...customWords];
       const seenChinese = new Set();
+      const seenIds = new Set();
       const unique = [];
 
       all.forEach(word => {
-        const key = normalizeChinese(word.chinese);
-
-        if (!seenChinese.has(key)) {
-          seenChinese.add(key);
-          unique.push(word);
+        if (!word) {
+          return;
         }
+
+        const chineseKey = normalizeChinese(word.chinese);
+        const idKey = normalizeId(word.id);
+
+        if (!chineseKey || !idKey) {
+          return;
+        }
+
+        if (seenChinese.has(chineseKey) || seenIds.has(idKey)) {
+          return;
+        }
+
+        seenChinese.add(chineseKey);
+        seenIds.add(idKey);
+        unique.push(word);
       });
 
       return unique;
@@ -520,6 +804,14 @@
         item.status = "learned";
       }
     }
+
+    // =====================================================
+    // 9. LESSON FUNCTIONS — логика урока
+    // =====================================================
+    //
+    // Урок — это выбранная партия слов.
+    // Сейчас приложение выбирает до 10 слов, которые ещё
+    // не имеют статус learned.
 
     function startNewLesson() {
       const allWords = getAllWords();
@@ -574,6 +866,13 @@
         .filter(Boolean);
     }
 
+    // =====================================================
+    // 10. NAVIGATION — переключение вкладок
+    // =====================================================
+    //
+    // Эта функция показывает нужный экран:
+    // cards, writing, sentences или dictionary.
+
     function showMode(mode) {
       currentMode = mode;
 
@@ -594,6 +893,13 @@
 
       renderAll();
     }
+
+    // =====================================================
+    // 11. MAIN RENDER — общее обновление экрана
+    // =====================================================
+    //
+    // renderAll() перерисовывает все важные части приложения.
+    // Мы вызываем её после изменений прогресса, урока или словаря.
 
     function renderAll() {
       renderStats();
@@ -645,6 +951,13 @@
         </div>
       `;
     }
+
+    // =====================================================
+    // 12. CARDS MODE — режим карточек
+    // =====================================================
+    //
+    // Здесь пользователь смотрит слово, открывает ответ,
+    // нажимает “Я знаю” или “Повторить”.
 
     function renderCards() {
       const box = document.getElementById("cardBox");
@@ -747,6 +1060,13 @@
       nextCard();
       renderAll();
     }
+
+    // =====================================================
+    // 13. WRITING MODE — режим письма иероглифов
+    // =====================================================
+    //
+    // Здесь создаются canvas-доски.
+    // Если слово состоит из двух иероглифов, создаются две доски.
 
     function renderWriting() {
       const box = document.getElementById("writingBox");
@@ -928,6 +1248,13 @@
       renderAll();
     }
 
+    // =====================================================
+    // 14. SENTENCES MODE — режим предложений
+    // =====================================================
+    //
+    // Предложение открывается только тогда, когда пользователь
+    // уже познакомился с нужными словами.
+
     function getAvailableSentences() {
       return sentenceBank.filter(sentence => {
         return sentence.required.every(wordId => {
@@ -1045,6 +1372,13 @@
       renderSentences();
     }
 
+    // =====================================================
+    // 15. DICTIONARY MODE — экран словаря
+    // =====================================================
+    //
+    // Здесь можно добавить личное слово в localStorage.
+    // Базовые слова нужно добавлять в dictionary.js через GitHub.
+
     function addCustomWord() {
       const chinese = document.getElementById("newChinese").value.trim();
       const pinyin = document.getElementById("newPinyin").value.trim();
@@ -1091,7 +1425,9 @@
       const list = document.getElementById("dictionaryList");
       const allWords = getAllWords();
 
-      list.innerHTML = allWords.map(word => {
+      const warningsHTML = renderDictionaryWarnings();
+
+      const wordsHTML = allWords.map(word => {
         const item = getProgress(word.id);
 
         return `
@@ -1101,12 +1437,24 @@
             — ${word.meaning}
             <br>
             <span class="small-note">
-              type: ${word.type}, status: ${item.status}, mastery: ${item.mastery}/5
+              id: ${word.id},
+              type: ${word.type},
+              status: ${item.status},
+              mastery: ${item.mastery}/5
             </span>
           </div>
         `;
       }).join("");
+
+      list.innerHTML = warningsHTML + wordsHTML;
     }
+
+    // =====================================================
+    // 16. RESET / START — сброс и запуск приложения
+    // =====================================================
+    //
+    // resetProgress() очищает localStorage только в этом браузере.
+    // dictionary.js от этого не меняется.
 
     function resetProgress() {
       const answer = confirm("Сбросить прогресс, текущий урок и личные слова в этом браузере?");
@@ -1132,6 +1480,7 @@
       renderAll();
     }
 
+    // Первый запуск приложения после загрузки страницы.
     renderAll();
   </script>
 </body>
