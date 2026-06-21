@@ -424,7 +424,7 @@ function loadCurrentHanziCharacter() {
     width: size,
     height: size,
     padding: 24,
-    showOutline: true,
+    showOutline: false,
     showCharacter: false,
     strokeAnimationSpeed: 1,
     delayBetweenStrokes: 180,
