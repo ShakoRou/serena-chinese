@@ -278,18 +278,6 @@
       margin: 8px 0;
     }
 
-    .phrase-source {
-      display: inline-block;
-      margin-top: 8px;
-      padding: 6px 10px;
-      border-radius: 999px;
-      background: #ede4ff;
-      color: #5a3fa0;
-      font-size: 13px;
-      font-weight: bold;
-    }
-
-
     .word-info-box {
       margin-top: 14px;
       padding: 14px;
@@ -630,7 +618,6 @@
     let currentSentenceIndex = 0;
     let cardAnswerVisible = false;
     let chosenSentenceWords = [];
-    let currentSentencePhrase = null;
 
     // Фильтр для экрана “Словарь”.
     // Он показывает: все слова, новые, изучаются, повторить или выученные.
@@ -654,222 +641,6 @@
     function getAllPhrases() {
       return [...phraseBank, ...customPhrases];
     }
-
-    // =====================================================
-    // 4.1 GRAMMAR PATTERNS — маленький движок китайских фраз
-    // =====================================================
-    //
-    // phrases.js хранит готовые фразы.
-    // grammarPatternBank хранит правила, по которым приложение
-    // может создавать новые фразы само, но без ИИ.
-    //
-    // Главное правило: мы не берём случайный глагол и случайное
-    // существительное. Для каждого шаблона вручную указаны слова,
-    // которые имеют смысл вместе.
-
-    const grammarPatternBank = [
-      {
-        id: "drink_object",
-        source: "pattern",
-        name: "Кто-то пьёт что-то",
-        ru: "{subject} пьёт {object}.",
-        explanation: "Шаблон: кто + 喝 + напиток. 喝 используется с напитками: вода, чай, молоко, кофе.",
-        slots: [
-          { name: "subject", wordIds: ["wo", "ni", "ta_male", "ta_female", "women", "nimen"] },
-          { name: "verb", wordIds: ["he"] },
-          { name: "object", wordIds: ["shui", "cha", "niunai", "kafei"] },
-          { text: "。" }
-        ]
-      },
-      {
-        id: "eat_object",
-        source: "pattern",
-        name: "Кто-то ест что-то",
-        ru: "{subject} ест {object}.",
-        explanation: "Шаблон: кто + 吃 + еда. 吃 используется с едой: рис, лапша, еда.",
-        slots: [
-          { name: "subject", wordIds: ["wo", "ni", "ta_male", "ta_female", "women", "nimen"] },
-          { name: "verb", wordIds: ["chi"] },
-          { name: "object", wordIds: ["fan", "mifan", "mian"] },
-          { text: "。" }
-        ]
-      },
-      {
-        id: "like_object",
-        source: "pattern",
-        name: "Кому-то нравится что-то",
-        ru: "{subject} любит / нравится {object}.",
-        explanation: "Шаблон: кто + 喜欢 + что. 喜欢 показывает симпатию, вкус или предпочтение.",
-        slots: [
-          { name: "subject", wordIds: ["wo", "ni", "ta_male", "ta_female", "women"] },
-          { name: "verb", wordIds: ["xihuan"] },
-          { name: "object", wordIds: ["cha", "shui", "kafei", "niunai", "fan", "mifan", "mian", "xuexiao", "jia"] },
-          { text: "。" }
-        ]
-      },
-      {
-        id: "love_person",
-        source: "pattern",
-        name: "Кто-то любит кого-то",
-        ru: "{subject} любит {object}.",
-        explanation: "Шаблон: кто + 爱 + кого. 爱 сильнее, чем 喜欢, и часто используется для любви.",
-        slots: [
-          { name: "subject", wordIds: ["wo", "ni", "ta_male", "ta_female"] },
-          { name: "verb", wordIds: ["ai"] },
-          { name: "object", wordIds: ["mama", "baba", "pengyou", "ni"] },
-          { text: "。" }
-        ]
-      },
-      {
-        id: "be_person",
-        source: "pattern",
-        name: "Кто-то является кем-то",
-        ru: "{subject} является {object}.",
-        explanation: "Шаблон: кто + 是 + кто/что. 是 связывает предмет или человека с ролью.",
-        slots: [
-          { name: "subject", wordIds: ["wo", "ni", "ta_male", "ta_female"] },
-          { name: "verb", wordIds: ["shi"] },
-          { name: "object", wordIds: ["laoshi", "xuesheng", "pengyou", "ren"] },
-          { text: "。" }
-        ]
-      },
-      {
-        id: "be_at_place",
-        source: "pattern",
-        name: "Кто-то где-то находится",
-        ru: "{subject} находится здесь: {place}.",
-        explanation: "Шаблон: кто + 在 + место. 在 показывает, где находится человек.",
-        slots: [
-          { name: "subject", wordIds: ["wo", "ni", "ta_male", "ta_female", "mama", "baba", "laoshi", "xuesheng"] },
-          { name: "verb", wordIds: ["zai"] },
-          { name: "place", wordIds: ["jia", "xuexiao"] },
-          { text: "。" }
-        ]
-      },
-      {
-        id: "very_adjective",
-        source: "pattern",
-        name: "Кто-то или что-то очень какое-то",
-        ru: "{subject} очень {adjective}.",
-        explanation: "Шаблон: кто/что + 很 + качество. 很 часто ставится перед прилагательным.",
-        slots: [
-          { name: "subject", wordIds: ["wo", "ni", "ta_male", "ta_female", "pengyou", "laoshi", "xuexiao", "jia"] },
-          { name: "adverb", wordIds: ["hen"] },
-          { name: "adjective", wordIds: ["hao", "da", "xiao", "kuai", "man", "piaoliang"] },
-          { text: "。" }
-        ]
-      },
-      {
-        id: "negative_drink",
-        source: "pattern",
-        name: "Кто-то не пьёт что-то",
-        ru: "{subject} не пьёт {object}.",
-        explanation: "Шаблон: кто + 不 + глагол + объект. 不 ставится перед глаголом и делает отрицание.",
-        slots: [
-          { name: "subject", wordIds: ["wo", "ni", "ta_male", "ta_female"] },
-          { name: "negative", wordIds: ["bu"] },
-          { name: "verb", wordIds: ["he"] },
-          { name: "object", wordIds: ["shui", "cha", "niunai", "kafei"] },
-          { text: "。" }
-        ]
-      },
-      {
-        id: "negative_eat",
-        source: "pattern",
-        name: "Кто-то не ест что-то",
-        ru: "{subject} не ест {object}.",
-        explanation: "Шаблон: кто + 不 + 吃 + еда. Это простое отрицание действия.",
-        slots: [
-          { name: "subject", wordIds: ["wo", "ni", "ta_male", "ta_female"] },
-          { name: "negative", wordIds: ["bu"] },
-          { name: "verb", wordIds: ["chi"] },
-          { name: "object", wordIds: ["fan", "mifan", "mian"] },
-          { text: "。" }
-        ]
-      },
-      {
-        id: "want_to_drink",
-        source: "pattern",
-        name: "Кто-то хочет пить что-то",
-        ru: "{subject} хочет пить {object}.",
-        explanation: "Шаблон: кто + 要 + глагол + объект. 要 может значить “хотеть” или “нужно”.",
-        slots: [
-          { name: "subject", wordIds: ["wo", "ni", "ta_male", "ta_female"] },
-          { name: "want", wordIds: ["yao"] },
-          { name: "verb", wordIds: ["he"] },
-          { name: "object", wordIds: ["shui", "cha", "niunai", "kafei"] },
-          { text: "。" }
-        ]
-      },
-      {
-        id: "also_action",
-        source: "pattern",
-        name: "Кто-то тоже делает действие",
-        ru: "{subject} тоже {verb} {object}.",
-        explanation: "Шаблон: кто + 也 + действие + объект. 也 значит “тоже”.",
-        slots: [
-          { name: "subject", wordIds: ["wo", "ni", "ta_male", "ta_female"] },
-          { name: "also", wordIds: ["ye"] },
-          { name: "verb", wordIds: ["he", "chi", "kan", "ting", "shuo", "xie"] },
-          { name: "object", wordIds: ["cha", "shui", "fan", "mian", "xuexiao"] },
-          { text: "。" }
-        ]
-      },
-      {
-        id: "all_action",
-        source: "pattern",
-        name: "Все делают действие",
-        ru: "{subject} все {verb} {object}.",
-        explanation: "Шаблон: множественное подлежащее + 都 + действие. 都 значит “все”.",
-        slots: [
-          { name: "subject", wordIds: ["women", "nimen", "tamen"] },
-          { name: "all", wordIds: ["dou"] },
-          { name: "verb", wordIds: ["he", "chi", "kan", "ting", "shuo", "du", "xie"] },
-          { name: "object", wordIds: ["cha", "shui", "fan", "mian", "xuexiao"] },
-          { text: "。" }
-        ]
-      },
-      {
-        id: "yes_no_question_drink",
-        source: "pattern",
-        name: "Вопрос с 吗",
-        ru: "{subject} пьёт {object}?",
-        explanation: "Шаблон вопроса: утверждение + 吗. Частица 吗 превращает фразу в вопрос.",
-        slots: [
-          { name: "subject", wordIds: ["ni", "ta_male", "ta_female"] },
-          { name: "verb", wordIds: ["he"] },
-          { name: "object", wordIds: ["shui", "cha", "niunai", "kafei"] },
-          { name: "question", wordIds: ["ma"] },
-          { text: "？" }
-        ]
-      },
-      {
-        id: "where_question",
-        source: "pattern",
-        name: "Вопрос “где?”",
-        ru: "Где находится {subject}?",
-        explanation: "Шаблон: кто + 在 + 哪里. 哪里 значит “где/куда”.",
-        slots: [
-          { name: "subject", wordIds: ["ni", "ta_male", "ta_female", "mama", "baba", "laoshi", "xuesheng"] },
-          { name: "verb", wordIds: ["zai"] },
-          { name: "where", wordIds: ["nali"] },
-          { text: "？" }
-        ]
-      },
-      {
-        id: "what_question",
-        source: "pattern",
-        name: "Вопрос “что?”",
-        ru: "{subject} хочет что?",
-        explanation: "Шаблон: кто + 要 + 什么. 什么 значит “что”.",
-        slots: [
-          { name: "subject", wordIds: ["ni", "ta_male", "ta_female"] },
-          { name: "want", wordIds: ["yao"] },
-          { name: "what", wordIds: ["shenme"] },
-          { text: "？" }
-        ]
-      }
-    ];
 
     // =====================================================
     // 5. STORAGE FUNCTIONS — загрузка и сохранение
@@ -1709,23 +1480,13 @@
     // Потом пользователь собирает эту же фразу из кнопок.
 
     function getPhraseWordIds(phrase) {
-      return (phrase.tokens || [])
+      return phrase.tokens
         .filter(token => token.wordId)
         .map(token => token.wordId);
     }
 
-    function phraseHasOnlyExistingWords(phrase) {
-      const wordIds = getPhraseWordIds(phrase);
-
-      if (wordIds.length === 0) {
-        return false;
-      }
-
-      return wordIds.every(wordId => Boolean(getWordById(wordId)));
-    }
-
     function getPhraseCorrectAnswer(phrase) {
-      return (phrase.tokens || [])
+      return phrase.tokens
         .filter(token => token.wordId)
         .map(token => {
           const word = getWordById(token.wordId);
@@ -1734,181 +1495,44 @@
         .join("");
     }
 
-    function getCleanMeaning(word) {
-      return String((word && word.meaning) || "")
-        .split("/")[0]
-        .trim() || (word ? word.chinese : "");
-    }
+    function getAvailableSentences() {
+      const available = getAllPhrases().filter(phrase => {
+        const wordIds = getPhraseWordIds(phrase);
 
-    function chooseRandom(items) {
-      if (!items || items.length === 0) {
-        return null;
-      }
+        const existingWordIds = wordIds.filter(wordId => {
+          return Boolean(getWordById(wordId));
+        });
 
-      return items[Math.floor(Math.random() * items.length)];
-    }
+        if (existingWordIds.length !== wordIds.length) {
+          return false;
+        }
 
-    function chooseWordIdForSlot(wordIds) {
-      const existingWordIds = (wordIds || []).filter(wordId => Boolean(getWordById(wordId)));
+        const progressItems = existingWordIds.map(wordId => getProgress(wordId));
 
-      if (existingWordIds.length === 0) {
-        return null;
-      }
+        const knownCount = progressItems.filter(item => {
+          return item.status !== "new" || item.mastery > 0 || item.cardDone || item.writingDone;
+        }).length;
 
-      // Сначала стараемся брать слова, которые ещё не полностью выучены.
-      // Так генератор помогает повторять и закреплять слова.
-      const practiceWordIds = existingWordIds.filter(wordId => {
-        const item = getProgress(wordId);
-        return item.status !== "learned" || item.mastery < 5;
+        const newCount = progressItems.filter(item => {
+          return item.status === "new" && item.mastery === 0 && !item.cardDone && !item.writingDone;
+        }).length;
+
+        // Главная логика:
+        // фраза должна быть понятной, но обучающей.
+        // Поэтому в ней должно быть хотя бы одно знакомое слово
+        // и не слишком много новых слов.
+        return knownCount >= 1 && newCount <= 2;
       });
-
-      const pool = practiceWordIds.length > 0 ? practiceWordIds : existingWordIds;
-      return chooseRandom(pool);
-    }
-
-    function buildBankFromTokens(tokens) {
-      const words = (tokens || [])
-        .filter(token => token.wordId)
-        .map(token => getWordById(token.wordId))
-        .filter(Boolean)
-        .map(word => word.chinese);
-
-      return shuffle(words);
-    }
-
-    function buildTranslationFromPattern(pattern, chosenWords) {
-      let translation = pattern.ru || "Сгенерированная фраза.";
-
-      Object.keys(chosenWords).forEach(slotName => {
-        const word = chosenWords[slotName];
-        translation = translation.replaceAll(`{${slotName}}`, getCleanMeaning(word));
-      });
-
-      return translation;
-    }
-
-    function generatePhraseFromPattern(pattern) {
-      if (!pattern || !pattern.slots) {
-        return null;
-      }
-
-      const tokens = [];
-      const chosenWords = {};
-
-      for (const slot of pattern.slots) {
-        if (slot.text) {
-          tokens.push({ text: slot.text });
-          continue;
-        }
-
-        const wordId = chooseWordIdForSlot(slot.wordIds);
-
-        if (!wordId) {
-          return null;
-        }
-
-        const word = getWordById(wordId);
-
-        if (!word) {
-          return null;
-        }
-
-        tokens.push({ wordId: word.id });
-
-        if (slot.name) {
-          chosenWords[slot.name] = word;
-        }
-      }
-
-      return {
-        id: "generated_" + pattern.id + "_" + Date.now() + "_" + Math.floor(Math.random() * 100000),
-        source: "generated",
-        patternId: pattern.id,
-        patternName: pattern.name,
-        translation: buildTranslationFromPattern(pattern, chosenWords),
-        tokens: tokens,
-        bank: buildBankFromTokens(tokens),
-        explanation: pattern.explanation + " Это предложение создано автоматически по грамматическому шаблону."
-      };
-    }
-
-    function getReadyPhrasesForPractice() {
-      const ready = getAllPhrases().filter(phraseHasOnlyExistingWords);
 
       // Пользовательские фразы показываем чаще: добавляем их в список ещё раз.
-      const favoriteCustomPhrases = ready.filter(phrase => phrase.isCustom);
+      // Это не создаёт дубль в памяти, а только увеличивает шанс встретить фразу.
+      const favoriteCustomPhrases = available.filter(phrase => phrase.isCustom);
 
-      return [...ready, ...favoriteCustomPhrases];
-    }
-
-    function getGeneratedPhraseForPractice() {
-      const possiblePatterns = grammarPatternBank.filter(pattern => {
-        return pattern.slots.every(slot => {
-          if (slot.text) {
-            return true;
-          }
-
-          return (slot.wordIds || []).some(wordId => Boolean(getWordById(wordId)));
-        });
-      });
-
-      if (possiblePatterns.length === 0) {
-        return null;
-      }
-
-      // Пробуем несколько раз, чтобы не сломаться, если один шаблон не подошёл.
-      for (let attempt = 0; attempt < 20; attempt++) {
-        const pattern = chooseRandom(possiblePatterns);
-        const phrase = generatePhraseFromPattern(pattern);
-
-        if (phrase) {
-          return phrase;
-        }
-      }
-
-      return null;
-    }
-
-    function getPhraseForPractice() {
-      const readyPhrases = getReadyPhrasesForPractice();
-      const canGenerate = grammarPatternBank.length > 0;
-
-      // В 70% случаев берём сгенерированную фразу.
-      // В 30% случаев берём готовую фразу из phrases.js.
-      // Так мы получаем и свободу, и реальные заранее подготовленные примеры.
-      const shouldGenerate = canGenerate && (readyPhrases.length === 0 || Math.random() < 0.7);
-
-      if (shouldGenerate) {
-        const generated = getGeneratedPhraseForPractice();
-
-        if (generated) {
-          return generated;
-        }
-      }
-
-      if (readyPhrases.length > 0) {
-        return chooseRandom(readyPhrases);
-      }
-
-      return getGeneratedPhraseForPractice();
-    }
-
-    // Старое имя оставляем, но теперь оно возвращает только готовые фразы.
-    // Основной выбор идёт через getPhraseForPractice().
-    function getAvailableSentences() {
-      return getReadyPhrasesForPractice();
-    }
-
-    function ensureCurrentSentencePhrase() {
-      if (!currentSentencePhrase) {
-        currentSentencePhrase = getPhraseForPractice();
-      }
-
-      return currentSentencePhrase;
+      return [...available, ...favoriteCustomPhrases];
     }
 
     function renderPhraseTokens(phrase) {
-      return (phrase.tokens || []).map(token => {
+      return phrase.tokens.map(token => {
         if (token.text) {
           return `<span>${token.text}</span>`;
         }
@@ -1972,31 +1596,29 @@
 
     function renderSentences() {
       const box = document.getElementById("sentenceBox");
-      const phrase = ensureCurrentSentencePhrase();
+      const availableSentences = getAvailableSentences();
 
-      if (!phrase) {
+      if (availableSentences.length === 0) {
         box.innerHTML = `
           <p>Пока нет доступных фраз.</p>
           <p class="small-note">
-            Проверь, что dictionary.js подключён правильно. Генератору нужны слова из словаря.
+            Сначала познакомься хотя бы с несколькими словами в карточках.
+            Тогда здесь появятся фразы, где есть знакомые и новые слова.
           </p>
           <button onclick="showMode('cards')">Вернуться к словам</button>
         `;
         return;
       }
 
-      const sourceLabel = phrase.source === "generated"
-        ? `Сгенерировано по шаблону: ${phrase.patternName || "грамматика"}`
-        : (phrase.isCustom ? "Твоя личная фраза" : "Готовая фраза из phrases.js");
+      if (currentSentenceIndex >= availableSentences.length) {
+        currentSentenceIndex = 0;
+      }
 
-      const bankWords = phrase.bank && phrase.bank.length > 0
-        ? phrase.bank
-        : buildBankFromTokens(phrase.tokens);
+      const phrase = availableSentences[currentSentenceIndex];
 
       box.innerHTML = `
         <div class="phrase-card">
           <p class="small-note">Нажми на любое китайское слово, чтобы увидеть pinyin, перевод и тип слова.</p>
-          <div class="phrase-source">${sourceLabel}</div>
           <div class="phrase-text">
             ${renderPhraseTokens(phrase)}
           </div>
@@ -2046,7 +1668,7 @@
 
       const bank = document.getElementById("sentenceBank");
 
-      bankWords.forEach(word => {
+      phrase.bank.forEach(word => {
         const button = document.createElement("button");
         button.className = "secondary";
         button.textContent = word;
@@ -2059,7 +1681,8 @@
     }
 
     function checkSentence() {
-      const phrase = ensureCurrentSentencePhrase();
+      const availableSentences = getAvailableSentences();
+      const phrase = availableSentences[currentSentenceIndex];
 
       if (!phrase) return false;
 
@@ -2182,8 +1805,6 @@
       message.className = "message sentence-message-success";
       message.textContent = "Фраза добавлена и будет встречаться чаще.";
 
-      currentSentencePhrase = phrase;
-      chosenSentenceWords = [];
       renderAll();
     }
 
@@ -2193,7 +1814,11 @@
     }
 
     function nextSentence() {
-      currentSentencePhrase = getPhraseForPractice();
+      const availableSentences = getAvailableSentences();
+
+      if (availableSentences.length === 0) return;
+
+      currentSentenceIndex = (currentSentenceIndex + 1) % availableSentences.length;
       chosenSentenceWords = [];
       renderSentences();
     }
