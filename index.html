@@ -222,6 +222,70 @@
 
     /* ---------- Блок построения предложений ---------- */
 
+
+
+    /* Фразы в контексте: кликабельные слова внутри готового предложения */
+    .phrase-card {
+      background: #faf7ff;
+      border: 2px solid #e0d2ff;
+      border-radius: 22px;
+      padding: 18px;
+      margin: 12px 0;
+    }
+
+    .phrase-text {
+      font-size: 34px;
+      line-height: 1.7;
+      margin: 12px 0;
+    }
+
+    .phrase-token {
+      display: inline-block;
+      padding: 6px 10px;
+      margin: 4px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: 0.2s;
+      border: 2px solid transparent;
+    }
+
+    .phrase-token.known {
+      background: #e8ddff;
+      color: #3c266d;
+    }
+
+    .phrase-token.new-word {
+      background: #ffe6a7;
+      color: #6b3b00;
+      border-color: #d98c20;
+    }
+
+    .phrase-token.review-word {
+      background: #ffd9c7;
+      color: #6b2500;
+      border-color: #d98c20;
+    }
+
+    .phrase-token:hover {
+      transform: translateY(-1px);
+      opacity: 0.9;
+    }
+
+    .phrase-translation {
+      font-size: 20px;
+      color: #5a3fa0;
+      margin: 8px 0;
+    }
+
+    .word-info-box {
+      margin-top: 14px;
+      padding: 14px;
+      border-radius: 16px;
+      background: white;
+      border: 2px solid #e0d2ff;
+      text-align: center;
+    }
+
     .sentence-bank,
     .sentence-answer {
       min-height: 55px;
@@ -516,62 +580,146 @@
     let currentDictionaryFilter = "all";
 
     // =====================================================
-    // 4. SENTENCE BANK — база упражнений с предложениями
+    // 4. PHRASE BANK — готовые фразы для контекстного обучения
     // =====================================================
     //
-    // Это заранее подготовленные упражнения.
-    // required — какие слова нужно знать, чтобы упражнение открылось.
-    // correct — правильный порядок.
-    // bank — слова-кнопки, которые видит пользователь.
+    // Это не просто “собери предложение”. Теперь каждая фраза
+    // состоит из tokens — отдельных слов, связанных с dictionary.js.
+    //
+    // wordId — id слова из dictionary.js.
+    // text — обычный знак или текст, который не нужно искать в словаре.
+    // bank — слова-кнопки для сборки фразы.
+    // translation — перевод всей фразы.
+    // explanation — короткое грамматическое объяснение.
 
-    const sentenceBank = [
+    const phraseBank = [
       {
-        id: "s1",
-        prompt: "Собери: Я люблю тебя.",
-        required: ["wo", "ai", "ni"],
-        correct: ["我", "爱", "你"],
-        bank: ["你", "爱", "我"],
-        explanation: "Базовый порядок: кто + действие + кого/что."
+        id: "p1",
+        translation: "Я люблю пить чай.",
+        tokens: [
+          { wordId: "wo" },
+          { wordId: "xihuan" },
+          { wordId: "he" },
+          { wordId: "cha" },
+          { text: "。" }
+        ],
+        bank: ["茶", "我", "喜欢", "喝"],
+        explanation: "我 = я, 喜欢 = нравится/любить, 喝 = пить, 茶 = чай."
       },
       {
-        id: "s2",
-        prompt: "Собери: Я пью воду.",
-        required: ["wo", "he", "shui"],
-        correct: ["我", "喝", "水"],
-        bank: ["水", "我", "喝"],
-        explanation: "我 = я, 喝 = пить, 水 = вода."
+        id: "p2",
+        translation: "Ты хочешь пить воду?",
+        tokens: [
+          { wordId: "ni" },
+          { wordId: "yao" },
+          { wordId: "he" },
+          { wordId: "shui" },
+          { wordId: "ma" },
+          { text: "？" }
+        ],
+        bank: ["水", "你", "吗", "要", "喝"],
+        explanation: "吗 в конце делает предложение вопросом. 要 может значить “хотеть” или “нужно”."
       },
       {
-        id: "s3",
-        prompt: "Собери: Ты пьёшь чай.",
-        required: ["ni", "he", "cha"],
-        correct: ["你", "喝", "茶"],
-        bank: ["茶", "喝", "你"],
-        explanation: "В китайском нет изменения глагола по лицам: 我喝, 你喝."
+        id: "p3",
+        translation: "Он не ест рис / еду.",
+        tokens: [
+          { wordId: "ta_male" },
+          { wordId: "bu" },
+          { wordId: "chi" },
+          { wordId: "fan" },
+          { text: "。" }
+        ],
+        bank: ["吃", "他", "饭", "不"],
+        explanation: "不 ставится перед глаголом: 不吃 = не есть."
       },
       {
-        id: "s4",
-        prompt: "Собери: Я ем еду.",
-        required: ["wo", "chi", "fan"],
-        correct: ["我", "吃", "饭"],
-        bank: ["饭", "我", "吃"],
-        explanation: "吃 = есть, 饭 = еда/рис."
+        id: "p4",
+        translation: "Сейчас я иду в школу.",
+        tokens: [
+          { wordId: "xianzai" },
+          { wordId: "wo" },
+          { wordId: "qu" },
+          { wordId: "xuexiao" },
+          { text: "。" }
+        ],
+        bank: ["学校", "现在", "去", "我"],
+        explanation: "现在 можно поставить в начале: сейчас + кто + действие + место."
       },
       {
-        id: "s5",
-        prompt: "Собери вопрос: Ты хороший?",
-        required: ["ni", "hao", "ma"],
-        correct: ["你", "好", "吗"],
-        bank: ["吗", "好", "你"],
-        explanation: "吗 ставится в конце предложения и делает его вопросом."
+        id: "p5",
+        translation: "Мама пьёт кофе.",
+        tokens: [
+          { wordId: "mama" },
+          { wordId: "he" },
+          { wordId: "kafei" },
+          { text: "。" }
+        ],
+        bank: ["咖啡", "妈妈", "喝"],
+        explanation: "Простой порядок: кто + действие + что."
       },
       {
-        id: "s6",
-        prompt: "Собери: Я не пью чай.",
-        required: ["wo", "bu", "he", "cha"],
-        correct: ["我", "不", "喝", "茶"],
-        bank: ["茶", "不", "我", "喝"],
-        explanation: "不 ставится перед глаголом: 不喝 = не пить."
+        id: "p6",
+        translation: "Учитель говорит очень медленно.",
+        tokens: [
+          { wordId: "laoshi" },
+          { wordId: "shuo" },
+          { wordId: "hen" },
+          { wordId: "man" },
+          { text: "。" }
+        ],
+        bank: ["慢", "老师", "很", "说"],
+        explanation: "很 часто ставится перед прилагательным: 很慢 = очень медленно."
+      },
+      {
+        id: "p7",
+        translation: "Я хочу купить кофе.",
+        tokens: [
+          { wordId: "wo" },
+          { wordId: "xiang" },
+          { wordId: "mai_buy" },
+          { wordId: "kafei" },
+          { text: "。" }
+        ],
+        bank: ["咖啡", "买", "我", "想"],
+        explanation: "想 + глагол = хотеть что-то сделать."
+      },
+      {
+        id: "p8",
+        translation: "Ты умеешь писать?",
+        tokens: [
+          { wordId: "ni" },
+          { wordId: "hui_can" },
+          { wordId: "xie" },
+          { wordId: "ma" },
+          { text: "？" }
+        ],
+        bank: ["写", "会", "吗", "你"],
+        explanation: "会 + глагол часто значит “уметь что-то делать”."
+      },
+      {
+        id: "p9",
+        translation: "Мы все учимся / читаем.",
+        tokens: [
+          { wordId: "women" },
+          { wordId: "dou" },
+          { wordId: "du" },
+          { text: "。" }
+        ],
+        bank: ["读", "都", "我们"],
+        explanation: "都 означает “все”: 我们都 = мы все."
+      },
+      {
+        id: "p10",
+        translation: "Я возвращаюсь домой.",
+        tokens: [
+          { wordId: "wo" },
+          { wordId: "hui_return" },
+          { wordId: "jia" },
+          { text: "。" }
+        ],
+        bank: ["家", "回", "我"],
+        explanation: "回家 = возвращаться домой."
       }
     ];
 
@@ -1376,19 +1524,128 @@
     }
 
     // =====================================================
-    // 14. SENTENCES MODE — режим предложений
+    // 14. SENTENCES MODE — готовые фразы + сборка предложения
     // =====================================================
     //
-    // Предложение открывается только тогда, когда пользователь
-    // уже познакомился с нужными словами.
+    // Здесь пользователь видит готовую китайскую фразу.
+    // Каждое слово в фразе кликабельное:
+    // - знакомые слова спокойного цвета;
+    // - новые слова выделены жёлтым;
+    // - слова на повторение выделены тёплым оранжевым.
+    //
+    // По нажатию на слово приложение показывает карточку:
+    // иероглиф, pinyin, перевод, type, status, mastery.
+    // Потом пользователь собирает эту же фразу из кнопок.
+
+    function getPhraseWordIds(phrase) {
+      return phrase.tokens
+        .filter(token => token.wordId)
+        .map(token => token.wordId);
+    }
+
+    function getPhraseCorrectAnswer(phrase) {
+      return phrase.tokens
+        .filter(token => token.wordId)
+        .map(token => {
+          const word = getWordById(token.wordId);
+          return word ? word.chinese : "";
+        })
+        .join("");
+    }
 
     function getAvailableSentences() {
-      return sentenceBank.filter(sentence => {
-        return sentence.required.every(wordId => {
-          const item = getProgress(wordId);
-          return item.cardDone || item.writingDone || item.mastery > 0 || item.status !== "new";
+      return phraseBank.filter(phrase => {
+        const wordIds = getPhraseWordIds(phrase);
+
+        const existingWordIds = wordIds.filter(wordId => {
+          return Boolean(getWordById(wordId));
         });
+
+        if (existingWordIds.length !== wordIds.length) {
+          return false;
+        }
+
+        const progressItems = existingWordIds.map(wordId => getProgress(wordId));
+
+        const knownCount = progressItems.filter(item => {
+          return item.status !== "new" || item.mastery > 0 || item.cardDone || item.writingDone;
+        }).length;
+
+        const newCount = progressItems.filter(item => {
+          return item.status === "new" && item.mastery === 0 && !item.cardDone && !item.writingDone;
+        }).length;
+
+        // Главная логика:
+        // фраза должна быть понятной, но обучающей.
+        // Поэтому в ней должно быть хотя бы одно знакомое слово
+        // и не слишком много новых слов.
+        return knownCount >= 1 && newCount <= 2;
       });
+    }
+
+    function renderPhraseTokens(phrase) {
+      return phrase.tokens.map(token => {
+        if (token.text) {
+          return `<span>${token.text}</span>`;
+        }
+
+        const word = getWordById(token.wordId);
+
+        if (!word) {
+          return `<span class="phrase-token review-word">?</span>`;
+        }
+
+        const item = getProgress(word.id);
+        let statusClass = "known";
+
+        if (item.status === "new" && item.mastery === 0 && !item.cardDone && !item.writingDone) {
+          statusClass = "new-word";
+        }
+
+        if (item.status === "review") {
+          statusClass = "review-word";
+        }
+
+        return `
+          <span
+            class="phrase-token ${statusClass}"
+            onclick="showWordInfo('${word.id}')"
+            title="${word.pinyin} — ${word.meaning}"
+          >
+            ${word.chinese}
+          </span>
+        `;
+      }).join("");
+    }
+
+    function showWordInfo(wordId) {
+      const word = getWordById(wordId);
+      const box = document.getElementById("wordInfoBox");
+
+      if (!word || !box) {
+        return;
+      }
+
+      const item = getProgress(word.id);
+
+      box.innerHTML = `
+        <div class="word-info-box">
+          <div class="chinese-big">${word.chinese}</div>
+          <div class="pinyin">${word.pinyin}</div>
+          <div class="meaning">${word.meaning}</div>
+          <p class="small-note">
+            type: <strong>${word.type}</strong><br>
+            status: <strong>${item.status}</strong><br>
+            mastery: <strong>${item.mastery}/5</strong>
+          </p>
+          <div class="button-row">
+            <button class="secondary" onclick="moveWordToStatus('${word.id}', 'new')">В новые</button>
+            <button class="secondary" onclick="moveWordToStatus('${word.id}', 'learning')">В изучение</button>
+            <button class="warning" onclick="moveWordToStatus('${word.id}', 'review')">В повторение</button>
+            <button class="success" onclick="moveWordToStatus('${word.id}', 'learned')">В выученные</button>
+          </div>
+        </div>
+      `;
     }
 
     function renderSentences() {
@@ -1397,9 +1654,10 @@
 
       if (availableSentences.length === 0) {
         box.innerHTML = `
-          <p>Пока нет доступных предложений.</p>
+          <p>Пока нет доступных фраз.</p>
           <p class="small-note">
-            Сначала выучи нужные слова в карточках: 我, 你, 爱, 喝, 水, 茶.
+            Сначала познакомься хотя бы с несколькими словами в карточках.
+            Тогда здесь появятся фразы, где есть знакомые и новые слова.
           </p>
           <button onclick="showMode('cards')">Вернуться к словам</button>
         `;
@@ -1410,10 +1668,24 @@
         currentSentenceIndex = 0;
       }
 
-      const sentence = availableSentences[currentSentenceIndex];
+      const phrase = availableSentences[currentSentenceIndex];
 
       box.innerHTML = `
-        <p>${sentence.prompt}</p>
+        <div class="phrase-card">
+          <p class="small-note">Нажми на любое китайское слово, чтобы увидеть pinyin, перевод и тип слова.</p>
+          <div class="phrase-text">
+            ${renderPhraseTokens(phrase)}
+          </div>
+          <div class="phrase-translation">
+            ${phrase.translation}
+          </div>
+          <p class="small-note">
+            Жёлтые слова — новые. Оранжевые — на повторении. Сиреневые — уже знакомые.
+          </p>
+          <div id="wordInfoBox"></div>
+        </div>
+
+        <h3>Собери эту фразу</h3>
 
         <div class="sentence-answer" id="sentenceAnswer">
           ${
@@ -1428,7 +1700,7 @@
         <div class="button-row">
           <button class="success" onclick="checkSentence()">Проверить</button>
           <button class="secondary" onclick="clearSentence()">Очистить</button>
-          <button onclick="nextSentence()">Следующее</button>
+          <button onclick="nextSentence()">Следующая фраза</button>
         </div>
 
         <div id="sentenceMessage" class="message"></div>
@@ -1436,7 +1708,7 @@
 
       const bank = document.getElementById("sentenceBank");
 
-      sentence.bank.forEach(word => {
+      phrase.bank.forEach(word => {
         const button = document.createElement("button");
         button.className = "secondary";
         button.textContent = word;
@@ -1450,18 +1722,18 @@
 
     function checkSentence() {
       const availableSentences = getAvailableSentences();
-      const sentence = availableSentences[currentSentenceIndex];
+      const phrase = availableSentences[currentSentenceIndex];
 
-      if (!sentence) return;
+      if (!phrase) return;
 
       const userAnswer = chosenSentenceWords.join("");
-      const correctAnswer = sentence.correct.join("");
+      const correctAnswer = getPhraseCorrectAnswer(phrase);
       const message = document.getElementById("sentenceMessage");
 
       if (userAnswer === correctAnswer) {
-        message.innerHTML = `Правильно. ${sentence.explanation}`;
+        message.innerHTML = `Правильно. ${phrase.explanation}`;
 
-        sentence.required.forEach(wordId => {
+        getPhraseWordIds(phrase).forEach(wordId => {
           const item = getProgress(wordId);
           item.sentenceDone = true;
           item.mastery = Math.min(5, item.mastery + 1);
@@ -1471,9 +1743,9 @@
         saveProgress();
         renderStats();
       } else {
-        message.innerHTML = `Пока неправильно. Правильный ответ: ${correctAnswer}. ${sentence.explanation}`;
+        message.innerHTML = `Пока неправильно. Правильный ответ: ${correctAnswer}. ${phrase.explanation}`;
 
-        sentence.required.forEach(wordId => {
+        getPhraseWordIds(phrase).forEach(wordId => {
           const item = getProgress(wordId);
           item.wrongCount++;
           item.status = "review";
