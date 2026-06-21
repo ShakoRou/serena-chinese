@@ -1,6 +1,6 @@
 // =====================================================
 // Serena Chinese — app.js
-// Этот файл отвечает только за логику приложения.
+// Логика приложения.
 // =====================================================
 
 const PROGRESS_KEY = "serenaChineseProgressV2";
@@ -18,11 +18,16 @@ let currentLesson = loadJSON(LESSON_KEY, []);
 let currentCardIndex = 0;
 let currentMode = "cards";
 let dictionaryFilter = "all";
+
 let currentPhrase = null;
 let selectedBankIndexes = [];
 let sentenceAnswer = [];
-let isDrawing = false;
-let canvasContext = null;
+
+let hanziWriter = null;
+let writingWord = null;
+let writingCharacters = [];
+let writingCharacterIndex = 0;
+let selectedWritingWordId = null;
 
 function loadJSON(key, fallback) {
   try {
@@ -45,6 +50,15 @@ function shuffle(items) {
 function chooseRandom(items) {
   if (!items.length) return null;
   return items[Math.floor(Math.random() * items.length)];
+}
+
+function escapeHTML(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
 function getAllWords() {
@@ -90,15 +104,18 @@ function saveProgress() {
 
 function updateStatus(wordId) {
   const item = getProgress(wordId);
+
   if (item.mastery <= 0) item.status = "new";
   else if (item.mastery < 3) item.status = "learning";
   else if (item.mastery < 5) item.status = "review";
   else item.status = "learned";
+
   saveProgress();
 }
 
 function moveWordToStatus(wordId, newStatus) {
   const item = getProgress(wordId);
+
   if (newStatus === "new") {
     item.status = "new";
     item.mastery = 0;
@@ -106,14 +123,17 @@ function moveWordToStatus(wordId, newStatus) {
     item.writingDone = false;
     item.sentenceDone = false;
   }
+
   if (newStatus === "learning") {
     item.status = "learning";
     item.mastery = Math.max(item.mastery, 1);
   }
+
   if (newStatus === "review") {
     item.status = "review";
     item.mastery = Math.max(item.mastery, 3);
   }
+
   if (newStatus === "learned") {
     item.status = "learned";
     item.mastery = 5;
@@ -121,10 +141,14 @@ function moveWordToStatus(wordId, newStatus) {
     item.writingDone = true;
     item.sentenceDone = true;
   }
+
   saveProgress();
-  renderStats();
-  if (currentMode === "dictionary") renderDictionary();
-  if (currentMode === "sentences" && currentPhrase) renderSentence();
+  renderAll();
+
+  if (currentMode === "sentences" && currentPhrase) {
+    renderSentence();
+    showWordInfo(wordId);
+  }
 }
 
 function moveWordToStatusFromSelect(wordId, value) {
@@ -143,6 +167,7 @@ function statusLabel(status) {
 
 function renderStats() {
   const counts = { new: 0, learning: 0, review: 0, learned: 0 };
+
   getAllWords().forEach(word => {
     const status = getProgress(word.id).status;
     counts[status] = (counts[status] || 0) + 1;
@@ -165,14 +190,17 @@ function renderStats() {
 
 function showMode(mode) {
   currentMode = mode;
+
   document.querySelectorAll(".mode-section").forEach(section => section.classList.add("hidden"));
   document.querySelectorAll(".tabs button").forEach(button => button.classList.remove("active"));
 
   document.getElementById(mode + "Mode").classList.remove("hidden");
   document.getElementById("tab-" + mode).classList.add("active");
 
+  if (mode === "cards") renderCard();
   if (mode === "writing") renderWriting();
   if (mode === "sentences" && !currentPhrase) nextPhrase();
+  if (mode === "sentences" && currentPhrase) renderSentence();
   if (mode === "dictionary") renderDictionary();
 }
 
@@ -194,7 +222,6 @@ function startNewLesson() {
   currentCardIndex = 0;
   saveJSON(LESSON_KEY, currentLesson);
   showMode("cards");
-  renderCard();
 }
 
 function continueLesson() {
@@ -202,14 +229,27 @@ function continueLesson() {
     startNewLesson();
     return;
   }
+
   showMode("cards");
-  renderCard();
 }
 
 function getCurrentCardWord() {
   if (!currentLesson.length) return null;
   const safeIndex = Math.min(currentCardIndex, currentLesson.length - 1);
   return getWordById(currentLesson[safeIndex]);
+}
+
+function getWritingShortcutButton(wordId) {
+  return `
+    <button
+      class="write-shortcut-button"
+      onclick="openWritingForWord('${escapeHTML(wordId)}')"
+      title="Писать иероглиф"
+      aria-label="Писать иероглиф"
+    >
+      ✎
+    </button>
+  `;
 }
 
 function renderCard(showAnswer = false) {
@@ -233,12 +273,18 @@ function renderCard(showAnswer = false) {
   box.innerHTML = `
     <div class="study-card">
       <div class="meta">${currentCardIndex + 1} / ${currentLesson.length} · ${statusLabel(item.status)}</div>
-      <div class="chinese-big">${word.chinese}</div>
+
+      <div class="word-title-row">
+        <div class="chinese-big">${escapeHTML(word.chinese)}</div>
+        ${getWritingShortcutButton(word.id)}
+      </div>
+
       ${showAnswer ? `
-        <div class="pinyin">${word.pinyin}</div>
-        <div class="meaning">${word.meaning}</div>
-        <p class="meta">type: ${word.type} · mastery: ${item.mastery}/5</p>
+        <div class="pinyin">${escapeHTML(word.pinyin)}</div>
+        <div class="meaning">${escapeHTML(word.meaning)}</div>
+        <p class="meta">type: ${escapeHTML(word.type)} · mastery: ${item.mastery}/5</p>
       ` : `<p class="muted">Вспомни pinyin и перевод, потом нажми “Показать ответ”.</p>`}
+
       <div class="button-row" style="justify-content:center">
         ${showAnswer ? `
           <button class="secondary" onclick="markCardHard()">Повторить</button>
@@ -252,10 +298,12 @@ function renderCard(showAnswer = false) {
 function markCardKnown() {
   const word = getCurrentCardWord();
   if (!word) return;
+
   const item = getProgress(word.id);
   item.cardDone = true;
   item.mastery = Math.min(5, item.mastery + 1);
   updateStatus(word.id);
+
   currentCardIndex = (currentCardIndex + 1) % currentLesson.length;
   renderAll();
   renderCard();
@@ -264,86 +312,238 @@ function markCardKnown() {
 function markCardHard() {
   const word = getCurrentCardWord();
   if (!word) return;
+
   const item = getProgress(word.id);
   item.wrongCount += 1;
   item.mastery = Math.max(1, item.mastery);
   updateStatus(word.id);
+
   currentCardIndex = (currentCardIndex + 1) % currentLesson.length;
   renderAll();
   renderCard();
 }
 
+// =====================================================
+// WRITING MODE — Hanzi Writer
+// =====================================================
+
+function openWritingForWord(wordId) {
+  const word = getWordById(wordId);
+  if (!word) return;
+
+  selectedWritingWordId = wordId;
+  showMode("writing");
+}
+
 function renderWriting() {
-  const word = getCurrentCardWord() || getAllWords()[0];
-  document.getElementById("writingWord").innerHTML = word ? `${word.chinese} <span class="pinyin">${word.pinyin}</span>` : "";
-  setupCanvas();
+  const forcedWord = selectedWritingWordId ? getWordById(selectedWritingWordId) : null;
+  const word = forcedWord || getCurrentCardWord() || getAllWords()[0];
+  writingWord = word;
+
+  const wordBox = document.getElementById("writingWord");
+  const charactersBox = document.getElementById("writingCharacters");
+  const target = document.getElementById("hanziTarget");
+
+  if (!word) {
+    wordBox.innerHTML = "Нет слов для письма.";
+    charactersBox.innerHTML = "";
+    target.innerHTML = "";
+    return;
+  }
+
+  writingCharacters = getCharactersFromWord(word);
+  writingCharacterIndex = 0;
+
+  wordBox.innerHTML = `
+    ${escapeHTML(word.chinese)}
+    <span class="pinyin">${escapeHTML(word.pinyin)}</span>
+    <div class="meaning">${escapeHTML(word.meaning)}</div>
+  `;
+
+  renderWritingCharacterButtons();
+  loadCurrentHanziCharacter();
 }
 
-function setupCanvas() {
-  const canvas = document.getElementById("writingCanvas");
-  if (!canvas || canvas.dataset.ready === "yes") return;
-  canvas.dataset.ready = "yes";
-  canvasContext = canvas.getContext("2d");
-  canvasContext.lineWidth = 5;
-  canvasContext.lineCap = "round";
-  canvasContext.strokeStyle = "#2f1b59";
-
-  function getPoint(event) {
-    const rect = canvas.getBoundingClientRect();
-    const clientX = event.touches ? event.touches[0].clientX : event.clientX;
-    const clientY = event.touches ? event.touches[0].clientY : event.clientY;
-    return {
-      x: (clientX - rect.left) * (canvas.width / rect.width),
-      y: (clientY - rect.top) * (canvas.height / rect.height)
-    };
-  }
-
-  function start(event) {
-    event.preventDefault();
-    isDrawing = true;
-    const point = getPoint(event);
-    canvasContext.beginPath();
-    canvasContext.moveTo(point.x, point.y);
-  }
-
-  function move(event) {
-    if (!isDrawing) return;
-    event.preventDefault();
-    const point = getPoint(event);
-    canvasContext.lineTo(point.x, point.y);
-    canvasContext.stroke();
-  }
-
-  function end() { isDrawing = false; }
-
-  canvas.addEventListener("mousedown", start);
-  canvas.addEventListener("mousemove", move);
-  canvas.addEventListener("mouseup", end);
-  canvas.addEventListener("mouseleave", end);
-  canvas.addEventListener("touchstart", start, { passive: false });
-  canvas.addEventListener("touchmove", move, { passive: false });
-  canvas.addEventListener("touchend", end);
+function getCharactersFromWord(word) {
+  return Array.from(word.chinese).filter(character => isChineseCharacter(character));
 }
 
-function clearCanvas() {
-  const canvas = document.getElementById("writingCanvas");
-  if (!canvasContext) canvasContext = canvas.getContext("2d");
-  canvasContext.clearRect(0, 0, canvas.width, canvas.height);
+function isChineseCharacter(character) {
+  return /[\u3400-\u9FFF]/.test(character);
+}
+
+function renderWritingCharacterButtons() {
+  const box = document.getElementById("writingCharacters");
+
+  if (!writingCharacters.length) {
+    box.innerHTML = `<p class="muted">В этом слове нет китайских иероглифов для тренировки.</p>`;
+    return;
+  }
+
+  box.innerHTML = writingCharacters.map((character, index) => `
+    <button
+      class="character-button ${index === writingCharacterIndex ? "active" : ""}"
+      onclick="selectWritingCharacter(${index})"
+    >
+      ${escapeHTML(character)}
+    </button>
+  `).join("");
+}
+
+function selectWritingCharacter(index) {
+  writingCharacterIndex = index;
+  renderWritingCharacterButtons();
+  loadCurrentHanziCharacter();
+}
+
+function loadCurrentHanziCharacter() {
+  const target = document.getElementById("hanziTarget");
+  const character = writingCharacters[writingCharacterIndex];
+
+  target.innerHTML = "";
+  hanziWriter = null;
+
+  if (!character) {
+    target.innerHTML = `<p class="muted">Выбери иероглиф.</p>`;
+    return;
+  }
+
+  if (typeof HanziWriter === "undefined") {
+    showWritingMessage("Hanzi Writer не загрузился. Проверь интернет или подключение в index.html.", "error");
+    target.innerHTML = `<p class="muted">Библиотека письма не загрузилась.</p>`;
+    return;
+  }
+
+  const size = getHanziBoxSize();
+  target.style.width = size + "px";
+  target.style.height = size + "px";
+
+  showWritingMessage(`Сейчас тренируем: ${character}`, "");
+
+  hanziWriter = HanziWriter.create("hanziTarget", character, {
+    width: size,
+    height: size,
+    padding: 24,
+    showOutline: true,
+    showCharacter: false,
+    strokeAnimationSpeed: 1,
+    delayBetweenStrokes: 180,
+    drawingWidth: 34,
+    radicalColor: "#6f3fd8",
+
+    onLoadCharDataSuccess: function() {
+      showWritingMessage(`Иероглиф ${character} загружен. Можно сразу писать.`, "ok");
+
+      setTimeout(function() {
+        startHanziQuiz(true);
+      }, 250);
+    },
+
+    onLoadCharDataError: function() {
+      showWritingMessage(`Не удалось загрузить данные для ${character}. Возможно, нет интернета или символ не поддерживается.`, "error");
+    }
+  });
+}
+
+function getHanziBoxSize() {
+  const box = document.querySelector(".hanzi-box");
+  const width = box ? box.clientWidth : 360;
+  return Math.min(360, Math.max(280, width - 36));
+}
+
+function animateHanzi() {
+  if (!hanziWriter) {
+    showWritingMessage("Сначала выбери иероглиф.", "error");
+    return;
+  }
+
+  showWritingMessage("Смотри порядок черт.", "");
+  hanziWriter.animateCharacter();
+}
+
+function startHanziQuiz(isAutoStart = false) {
+  if (!hanziWriter) {
+    showWritingMessage("Сначала выбери иероглиф.", "error");
+    return;
+  }
+
+  showWritingMessage(
+    isAutoStart
+      ? "Пиши сама. Если ошибёшься, приложение подскажет."
+      : "Пиши иероглиф по чертам. Если ошибёшься, приложение подскажет.",
+    ""
+  );
+
+  hanziWriter.quiz({
+    showHintAfterMisses: 2,
+    leniency: 1,
+
+    onCorrectStroke: function() {
+      showWritingMessage("Правильно. Продолжай.", "ok");
+    },
+
+    onMistake: function(strokeData) {
+      showWritingMessage(`Ошибка в этой черте. Ошибок: ${strokeData.totalMistakes}`, "error");
+    },
+
+    onComplete: function(summaryData) {
+      showWritingMessage(`Иероглиф завершён. Всего ошибок: ${summaryData.totalMistakes}`, "ok");
+    }
+  });
+}
+
+function previousWritingCharacter() {
+  if (!writingCharacters.length) return;
+
+  writingCharacterIndex -= 1;
+  if (writingCharacterIndex < 0) {
+    writingCharacterIndex = writingCharacters.length - 1;
+  }
+
+  renderWritingCharacterButtons();
+  loadCurrentHanziCharacter();
+}
+
+function nextWritingCharacter() {
+  if (!writingCharacters.length) return;
+
+  writingCharacterIndex = (writingCharacterIndex + 1) % writingCharacters.length;
+  renderWritingCharacterButtons();
+  loadCurrentHanziCharacter();
+}
+
+function showWritingMessage(text, type) {
+  const box = document.getElementById("writingMessage");
+  if (!box) return;
+
+  box.textContent = text || "";
+  box.className = type ? `message ${type}` : "message";
 }
 
 function markWritingDone() {
-  const word = getCurrentCardWord();
+  const word = writingWord || getCurrentCardWord();
   if (!word) return;
+
   const item = getProgress(word.id);
   item.writingDone = true;
   item.mastery = Math.min(5, item.mastery + 1);
+
   updateStatus(word.id);
   renderAll();
+  showWritingMessage(`Письмо для слова ${word.chinese} отмечено как выполненное.`, "ok");
 }
+
+// =====================================================
+// SENTENCES MODE
+// =====================================================
 
 function normalizePhrase(phrase) {
   const tokens = (phrase.tokens || []).filter(Boolean);
-  const words = tokens.filter(token => token.wordId).map(token => getWordById(token.wordId)).filter(Boolean);
+  const words = tokens
+    .filter(token => token.wordId)
+    .map(token => getWordById(token.wordId))
+    .filter(Boolean);
+
   return {
     ...phrase,
     tokens,
@@ -382,6 +582,7 @@ function nextPhraseAction() {
     const ok = checkSentence();
     if (!ok) return;
   }
+
   nextPhrase();
 }
 
@@ -402,17 +603,21 @@ function renderSentence() {
   }
 
   source.textContent = currentPhrase.source === "custom" ? "Личная фраза" : "Готовая фраза из phrases.js";
+
   phraseText.innerHTML = currentPhrase.tokens.map(token => {
-    if (token.text) return `<span>${token.text}</span>`;
+    if (token.text) return `<span>${escapeHTML(token.text)}</span>`;
+
     const word = getWordById(token.wordId);
     if (!word) return "";
+
     const status = getProgress(word.id).status;
-    return `<span class="phrase-token ${status}" onclick="showWordInfo('${word.id}')">${word.chinese}</span>`;
+    return `<span class="phrase-token ${status}" onclick="showWordInfo('${escapeHTML(word.id)}')">${escapeHTML(word.chinese)}</span>`;
   }).join("");
 
   prompt.textContent = currentPhrase.prompt || `Собери: ${currentPhrase.translation}`;
   message.textContent = "";
   message.className = "message";
+
   if (!infoBox.innerHTML) infoBox.innerHTML = "";
 
   renderSentenceBuild();
@@ -422,15 +627,20 @@ function renderSentence() {
 function showWordInfo(wordId) {
   const word = getWordById(wordId);
   if (!word) return;
+
   const item = getProgress(wordId);
+
   document.getElementById("wordInfoBox").innerHTML = `
     <div class="word-info-card">
-      <div class="chinese-big">${word.chinese}</div>
-      <div class="pinyin">${word.pinyin}</div>
-      <div class="meaning">${word.meaning}</div>
-      <p class="meta">type: ${word.type} · status: ${statusLabel(item.status)} · mastery: ${item.mastery}/5</p>
+      <div class="word-title-row">
+        <div class="chinese-big">${escapeHTML(word.chinese)}</div>
+        ${getWritingShortcutButton(word.id)}
+      </div>
+      <div class="pinyin">${escapeHTML(word.pinyin)}</div>
+      <div class="meaning">${escapeHTML(word.meaning)}</div>
+      <p class="meta">type: ${escapeHTML(word.type)} · status: ${statusLabel(item.status)} · mastery: ${item.mastery}/5</p>
       <label class="meta">Переместить слово в блок:</label>
-      <select onchange="moveWordToStatusFromSelect('${word.id}', this.value)">
+      <select onchange="moveWordToStatusFromSelect('${escapeHTML(word.id)}', this.value)">
         <option value="new" ${item.status === "new" ? "selected" : ""}>новые</option>
         <option value="learning" ${item.status === "learning" ? "selected" : ""}>изучение</option>
         <option value="review" ${item.status === "review" ? "selected" : ""}>повторение</option>
@@ -442,38 +652,45 @@ function showWordInfo(wordId) {
 
 function renderWordBank() {
   const bank = document.getElementById("wordBank");
+
   if (!currentPhrase) {
     bank.innerHTML = "";
     return;
   }
+
   bank.innerHTML = currentPhrase.bank.map((wordText, index) => {
     const selected = selectedBankIndexes.includes(index);
-    return `<span class="word-chip ${selected ? "selected" : ""}" onclick="addSentenceWord(${index})">${wordText}</span>`;
+    return `<span class="word-chip ${selected ? "selected" : ""}" onclick="addSentenceWord(${index})">${escapeHTML(wordText)}</span>`;
   }).join("");
 }
 
 function addSentenceWord(index) {
   if (!currentPhrase || selectedBankIndexes.includes(index)) return;
+
   selectedBankIndexes.push(index);
   sentenceAnswer.push(currentPhrase.bank[index]);
+
   renderSentenceBuild();
   renderWordBank();
 }
 
 function renderSentenceBuild() {
   const build = document.getElementById("sentenceBuild");
+
   if (!sentenceAnswer.length) {
     build.innerHTML = `<span class="muted">Нажимай слова снизу, чтобы собрать предложение.</span>`;
     return;
   }
+
   build.innerHTML = sentenceAnswer.map((word, index) =>
-    `<span class="word-chip" onclick="removeSentenceWord(${index})">${word}</span>`
+    `<span class="word-chip" onclick="removeSentenceWord(${index})">${escapeHTML(word)}</span>`
   ).join("");
 }
 
 function removeSentenceWord(answerIndex) {
   selectedBankIndexes.splice(answerIndex, 1);
   sentenceAnswer.splice(answerIndex, 1);
+
   renderSentenceBuild();
   renderWordBank();
 }
@@ -481,8 +698,10 @@ function removeSentenceWord(answerIndex) {
 function clearSentence() {
   selectedBankIndexes = [];
   sentenceAnswer = [];
+
   renderSentenceBuild();
   renderWordBank();
+
   const message = document.getElementById("sentenceMessage");
   message.textContent = "";
   message.className = "message";
@@ -496,11 +715,14 @@ function checkSentence() {
   if (isCorrect) {
     currentPhrase.tokens.forEach(token => {
       if (!token.wordId) return;
+
       const item = getProgress(token.wordId);
       item.sentenceDone = true;
       item.mastery = Math.min(5, item.mastery + 1);
+
       updateStatus(token.wordId);
     });
+
     renderStats();
     message.textContent = "Правильно. Переходим к следующей фразе.";
     message.className = "message ok";
@@ -512,8 +734,10 @@ function checkSentence() {
     const item = getProgress(token.wordId);
     item.wrongCount += 1;
   });
+
   saveProgress();
   renderStats();
+
   message.textContent = "Порядок неправильный. Исправь фразу и нажми “Следующая фраза” ещё раз.";
   message.className = "message error";
   return false;
@@ -526,6 +750,7 @@ function addCustomPhrase() {
   const message = document.getElementById("customPhraseMessage");
 
   const parts = chineseInput.split(/\s+/).filter(Boolean);
+
   if (!parts.length || !translation) {
     message.textContent = "Нужно написать китайские слова через пробел и перевод.";
     message.className = "message error";
@@ -534,6 +759,7 @@ function addCustomPhrase() {
 
   const words = parts.map(part => getWordByChinese(part));
   const missing = parts.filter((part, index) => !words[index]);
+
   if (missing.length) {
     message.textContent = `Этих слов нет в dictionary.js: ${missing.join(", ")}`;
     message.className = "message error";
@@ -553,18 +779,24 @@ function addCustomPhrase() {
 
   customPhrases.push(phrase);
   saveJSON(CUSTOM_PHRASES_KEY, customPhrases);
+
   message.textContent = "Фраза добавлена.";
   message.className = "message ok";
+
   document.getElementById("customPhraseChinese").value = "";
   document.getElementById("customPhraseTranslation").value = "";
   document.getElementById("customPhraseExplanation").value = "";
+
   nextPhrase();
 }
+
+// =====================================================
+// DICTIONARY MODE
+// =====================================================
 
 function setDictionaryFilter(status) {
   dictionaryFilter = status;
   showMode("dictionary");
-  renderDictionary();
 }
 
 function renderDictionaryWarnings() {
@@ -577,8 +809,10 @@ function renderDictionaryWarnings() {
     if (!word.id || !word.chinese || !word.pinyin || !word.meaning) {
       warnings.push("Есть слово с пропущенным id, chinese, pinyin или meaning.");
     }
+
     if (ids.has(word.id)) warnings.push(`Повторяется id: ${word.id}`);
     if (chinese.has(word.chinese)) warnings.push(`Повторяется chinese: ${word.chinese}`);
+
     ids.add(word.id);
     chinese.add(word.chinese);
   });
@@ -589,13 +823,16 @@ function renderDictionaryWarnings() {
 
 function renderDictionary() {
   renderDictionaryWarnings();
+
   const searchInput = document.getElementById("dictionarySearch");
   const search = searchInput ? searchInput.value.trim().toLowerCase() : "";
 
   let words = getAllWords();
+
   if (dictionaryFilter !== "all") {
     words = words.filter(word => getProgress(word.id).status === dictionaryFilter);
   }
+
   if (search) {
     words = words.filter(word =>
       word.chinese.includes(search) ||
@@ -607,13 +844,17 @@ function renderDictionary() {
 
   document.getElementById("dictionaryList").innerHTML = words.map(word => {
     const item = getProgress(word.id);
+
     return `
       <div class="word-row">
-        <div class="chinese">${word.chinese}</div>
-        <div class="pinyin">${word.pinyin}</div>
-        <div>${word.meaning}</div>
-        <p class="meta">id: ${word.id}<br>type: ${word.type}<br>status: ${statusLabel(item.status)} · mastery: ${item.mastery}/5</p>
-        <select onchange="moveWordToStatus('${word.id}', this.value)">
+        <div class="word-title-row">
+          <div class="chinese">${escapeHTML(word.chinese)}</div>
+          ${getWritingShortcutButton(word.id)}
+        </div>
+        <div class="pinyin">${escapeHTML(word.pinyin)}</div>
+        <div>${escapeHTML(word.meaning)}</div>
+        <p class="meta">id: ${escapeHTML(word.id)}<br>type: ${escapeHTML(word.type)}<br>status: ${statusLabel(item.status)} · mastery: ${item.mastery}/5</p>
+        <select onchange="moveWordToStatus('${escapeHTML(word.id)}', this.value)">
           <option value="new" ${item.status === "new" ? "selected" : ""}>новые</option>
           <option value="learning" ${item.status === "learning" ? "selected" : ""}>изучение</option>
           <option value="review" ${item.status === "review" ? "selected" : ""}>повторение</option>
@@ -644,13 +885,17 @@ function addCustomWord() {
   }
 
   const id = "custom_" + Date.now();
+
   customWords.push({ id, chinese, pinyin, meaning, level: 1, type });
   saveJSON(CUSTOM_WORDS_KEY, customWords);
+
   message.textContent = "Слово добавлено.";
   message.className = "message ok";
+
   document.getElementById("newChinese").value = "";
   document.getElementById("newPinyin").value = "";
   document.getElementById("newMeaning").value = "";
+
   renderAll();
   renderDictionary();
 }
@@ -658,24 +903,27 @@ function addCustomWord() {
 function resetProgress() {
   const ok = confirm("Сбросить прогресс на этом устройстве?");
   if (!ok) return;
+
   progress = {};
   currentLesson = [];
+
   localStorage.removeItem(PROGRESS_KEY);
   localStorage.removeItem(LESSON_KEY);
+
   renderAll();
   renderCard();
 }
 
 function renderAll() {
   renderStats();
+
   if (currentMode === "dictionary") renderDictionary();
+  if (currentMode === "cards") renderCard();
 }
 
 function boot() {
   renderAll();
   showMode("cards");
-  renderCard();
-  setTimeout(setupCanvas, 0);
 }
 
 boot();
