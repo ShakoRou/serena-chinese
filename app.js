@@ -21,8 +21,11 @@ let dictionaryFilter = "all";
 let currentPhrase = null;
 let selectedBankIndexes = [];
 let sentenceAnswer = [];
-let isDrawing = false;
-let canvasContext = null;
+
+let hanziWriter = null;
+let writingWord = null;
+let writingCharacters = [];
+let writingCharacterIndex = 0;
 
 function loadJSON(key, fallback) {
   try {
@@ -275,70 +278,181 @@ function markCardHard() {
 
 function renderWriting() {
   const word = getCurrentCardWord() || getAllWords()[0];
-  document.getElementById("writingWord").innerHTML = word ? `${word.chinese} <span class="pinyin">${word.pinyin}</span>` : "";
-  setupCanvas();
+  writingWord = word;
+
+  const wordBox = document.getElementById("writingWord");
+
+  if (!word) {
+    wordBox.innerHTML = "Нет слов для письма.";
+    document.getElementById("writingCharacters").innerHTML = "";
+    document.getElementById("hanziTarget").innerHTML = "";
+    return;
+  }
+
+  writingCharacters = getCharactersFromWord(word);
+  writingCharacterIndex = 0;
+
+  wordBox.innerHTML = `
+    ${word.chinese}
+    <span class="pinyin">${word.pinyin}</span>
+    <div class="meaning">${word.meaning}</div>
+  `;
+
+  renderWritingCharacterButtons();
+  loadCurrentHanziCharacter();
 }
 
-function setupCanvas() {
-  const canvas = document.getElementById("writingCanvas");
-  if (!canvas || canvas.dataset.ready === "yes") return;
-  canvas.dataset.ready = "yes";
-  canvasContext = canvas.getContext("2d");
-  canvasContext.lineWidth = 5;
-  canvasContext.lineCap = "round";
-  canvasContext.strokeStyle = "#2f1b59";
-
-  function getPoint(event) {
-    const rect = canvas.getBoundingClientRect();
-    const clientX = event.touches ? event.touches[0].clientX : event.clientX;
-    const clientY = event.touches ? event.touches[0].clientY : event.clientY;
-    return {
-      x: (clientX - rect.left) * (canvas.width / rect.width),
-      y: (clientY - rect.top) * (canvas.height / rect.height)
-    };
-  }
-
-  function start(event) {
-    event.preventDefault();
-    isDrawing = true;
-    const point = getPoint(event);
-    canvasContext.beginPath();
-    canvasContext.moveTo(point.x, point.y);
-  }
-
-  function move(event) {
-    if (!isDrawing) return;
-    event.preventDefault();
-    const point = getPoint(event);
-    canvasContext.lineTo(point.x, point.y);
-    canvasContext.stroke();
-  }
-
-  function end() { isDrawing = false; }
-
-  canvas.addEventListener("mousedown", start);
-  canvas.addEventListener("mousemove", move);
-  canvas.addEventListener("mouseup", end);
-  canvas.addEventListener("mouseleave", end);
-  canvas.addEventListener("touchstart", start, { passive: false });
-  canvas.addEventListener("touchmove", move, { passive: false });
-  canvas.addEventListener("touchend", end);
+function getCharactersFromWord(word) {
+  return Array.from(word.chinese).filter(character => isChineseCharacter(character));
 }
 
-function clearCanvas() {
-  const canvas = document.getElementById("writingCanvas");
-  if (!canvasContext) canvasContext = canvas.getContext("2d");
-  canvasContext.clearRect(0, 0, canvas.width, canvas.height);
+function isChineseCharacter(character) {
+  return /[\u3400-\u9FFF]/.test(character);
+}
+
+function renderWritingCharacterButtons() {
+  const box = document.getElementById("writingCharacters");
+
+  if (!writingCharacters.length) {
+    box.innerHTML = `<p class="muted">В этом слове нет китайских иероглифов для тренировки.</p>`;
+    return;
+  }
+
+  box.innerHTML = writingCharacters.map((character, index) => `
+    <button
+      class="character-button ${index === writingCharacterIndex ? "active" : ""}"
+      onclick="selectWritingCharacter(${index})"
+    >
+      ${character}
+    </button>
+  `).join("");
+}
+
+function selectWritingCharacter(index) {
+  writingCharacterIndex = index;
+  renderWritingCharacterButtons();
+  loadCurrentHanziCharacter();
+}
+
+function loadCurrentHanziCharacter() {
+  const target = document.getElementById("hanziTarget");
+  const character = writingCharacters[writingCharacterIndex];
+
+  target.innerHTML = "";
+  hanziWriter = null;
+
+  if (!character) {
+    target.innerHTML = `<p class="muted">Выбери иероглиф.</p>`;
+    return;
+  }
+
+  if (typeof HanziWriter === "undefined") {
+    showWritingMessage("Hanzi Writer не загрузился. Проверь интернет или подключение script в index.html.", "error");
+    return;
+  }
+
+  const size = getHanziBoxSize();
+  target.style.width = size + "px";
+  target.style.height = size + "px";
+
+  showWritingMessage(`Сейчас тренируем: ${character}`, "");
+
+  hanziWriter = HanziWriter.create("hanziTarget", character, {
+    width: size,
+    height: size,
+    padding: 24,
+    showOutline: true,
+    showCharacter: false,
+    strokeAnimationSpeed: 1,
+    delayBetweenStrokes: 180,
+    drawingWidth: 34,
+    radicalColor: "#6f3fd8",
+    onLoadCharDataSuccess: function() {
+      showWritingMessage(`Иероглиф ${character} загружен. Можно смотреть порядок черт или тренироваться.`, "ok");
+    },
+    onLoadCharDataError: function() {
+      showWritingMessage(`Не удалось загрузить данные для ${character}. Возможно, нет интернета или символ не поддерживается.`, "error");
+    }
+  });
+}
+
+function getHanziBoxSize() {
+  const box = document.querySelector(".hanzi-box");
+  const width = box ? box.clientWidth : 360;
+  return Math.min(360, Math.max(280, width - 36));
+}
+
+function animateHanzi() {
+  if (!hanziWriter) {
+    showWritingMessage("Сначала выбери иероглиф.", "error");
+    return;
+  }
+
+  showWritingMessage("Смотри порядок черт.", "");
+  hanziWriter.animateCharacter();
+}
+
+function startHanziQuiz() {
+  if (!hanziWriter) {
+    showWritingMessage("Сначала выбери иероглиф.", "error");
+    return;
+  }
+
+  showWritingMessage("Пиши иероглиф по чертам. Если ошибёшься, приложение подскажет.", "");
+
+  hanziWriter.quiz({
+    showHintAfterMisses: 2,
+    leniency: 1,
+    onCorrectStroke: function() {
+      showWritingMessage("Правильно. Продолжай.", "ok");
+    },
+    onMistake: function(strokeData) {
+      showWritingMessage(`Ошибка в этой черте. Ошибок: ${strokeData.totalMistakes}`, "error");
+    },
+    onComplete: function(summaryData) {
+      showWritingMessage(`Иероглиф завершён. Всего ошибок: ${summaryData.totalMistakes}`, "ok");
+    }
+  });
+}
+
+function previousWritingCharacter() {
+  if (!writingCharacters.length) return;
+
+  writingCharacterIndex -= 1;
+  if (writingCharacterIndex < 0) {
+    writingCharacterIndex = writingCharacters.length - 1;
+  }
+
+  renderWritingCharacterButtons();
+  loadCurrentHanziCharacter();
+}
+
+function nextWritingCharacter() {
+  if (!writingCharacters.length) return;
+
+  writingCharacterIndex = (writingCharacterIndex + 1) % writingCharacters.length;
+
+  renderWritingCharacterButtons();
+  loadCurrentHanziCharacter();
+}
+
+function showWritingMessage(text, type) {
+  const box = document.getElementById("writingMessage");
+  box.textContent = text || "";
+  box.className = type ? `message ${type}` : "message";
 }
 
 function markWritingDone() {
-  const word = getCurrentCardWord();
+  const word = writingWord || getCurrentCardWord();
   if (!word) return;
+
   const item = getProgress(word.id);
   item.writingDone = true;
   item.mastery = Math.min(5, item.mastery + 1);
+
   updateStatus(word.id);
   renderAll();
+  showWritingMessage(`Письмо для слова ${word.chinese} отмечено как выполненное.`, "ok");
 }
 
 function normalizePhrase(phrase) {
