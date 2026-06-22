@@ -1,11 +1,17 @@
 // =====================================================
 // Serena Chinese — app.js
 // Логика приложения.
+// Код организован по тем же блокам, что и сайт.
+// =====================================================
+
+// =====================================================
+// ОБЩЕЕ ЯДРО: ключи, данные, состояние приложения
 // =====================================================
 
 const PROGRESS_KEY = "serenaChineseProgressV2";
 const CUSTOM_WORDS_KEY = "serenaChineseCustomWordsV2";
 const CUSTOM_PHRASES_KEY = "serenaChineseCustomPhrasesV1";
+const CUSTOM_TEXTS_KEY = "serenaChineseCustomTextsV1";
 const LESSON_KEY = "serenaChineseCurrentLessonV2";
 
 const baseDictionary = Array.isArray(window.SERENA_DICTIONARY) ? window.SERENA_DICTIONARY.filter(Boolean) : [];
@@ -14,6 +20,8 @@ const basePhrases = Array.isArray(window.SERENA_PHRASES) ? window.SERENA_PHRASES
 let progress = loadJSON(PROGRESS_KEY, {});
 let customWords = loadJSON(CUSTOM_WORDS_KEY, []);
 let customPhrases = loadJSON(CUSTOM_PHRASES_KEY, []);
+let readingTexts = loadJSON(CUSTOM_TEXTS_KEY, []);
+let currentReadingTextId = readingTexts.length ? readingTexts[0].id : null;
 let currentLesson = loadJSON(LESSON_KEY, []);
 let currentCardIndex = 0;
 let currentMode = "cards";
@@ -23,11 +31,41 @@ let currentPhrase = null;
 let selectedBankIndexes = [];
 let sentenceAnswer = [];
 
+let currentMemoryExercise = "sentence";
+let currentMatchTask = null;
+let currentRecallTask = null;
+let currentDrawTask = null;
+let memoryHanziWriter = null;
+
 let hanziWriter = null;
 let writingWord = null;
 let writingCharacters = [];
 let writingCharacterIndex = 0;
-let selectedWritingWordId = null;
+let selectedWritingWordId = null; 
+
+let boardSentence = [];
+let boardClickTimer = null;
+let currentBoardPhrase = null;
+
+const boardPositions = [
+  { top: 18, left: 16, rotate: -5 },
+  { top: 14, left: 48, rotate: 3 },
+  { top: 20, left: 78, rotate: 6 },
+
+  { top: 42, left: 28, rotate: 4 },
+  { top: 38, left: 62, rotate: -4 },
+
+  { top: 62, left: 14, rotate: 5 },
+  { top: 66, left: 42, rotate: -3 },
+  { top: 58, left: 74, rotate: 4 },
+
+  { top: 82, left: 32, rotate: -5 },
+  { top: 80, left: 66, rotate: 3 }
+];
+
+// =====================================================
+// ОБЩИЕ ФУНКЦИИ: хранение, словарь, прогресс, озвучка
+// =====================================================
 
 function loadJSON(key, fallback) {
   try {
@@ -199,9 +237,9 @@ function showMode(mode) {
 
   if (mode === "cards") renderCard();
   if (mode === "writing") renderWriting();
-  if (mode === "sentences" && !currentPhrase) nextPhrase();
-  if (mode === "sentences" && currentPhrase) renderSentence();
+  if (mode === "sentences") renderMemory();
   if (mode === "dictionary") renderDictionary();
+  if (mode === "reading") renderReading();
 }
 
 function startNewLesson() {
@@ -333,48 +371,266 @@ function showWordInfoAndSpeak(element, wordId) {
   speakFromElement(element);
 }
 
-function renderCard(showAnswer = false) {
-  const box = document.getElementById("cardBox");
-  const word = getCurrentCardWord();
 
-  if (!word) {
+
+// =====================================================
+// БЛОК 1: УЧИТЬ СЛОВА — живая доска иероглифов
+// =====================================================
+
+function renderCard() {
+  const box = document.getElementById("cardBox");
+  const boardWords = getStudyBoardWords();
+  const boardPhrase = getBoardSuggestionPhrase(boardWords);
+
+  if (!boardWords.length) {
     box.innerHTML = `
       <div class="study-card">
-        <h3>Урок ещё не создан</h3>
-        <p class="muted">Нажми “Новый урок: 10 слов”.</p>
+        <h3>Пока нет новых слов для живой доски</h3>
+        <p class="muted">
+          Все новые слова уже перешли в изучение или повторение. Добавь новые слова в словарь
+          или перемести нужные слова обратно в категорию “новые”.
+        </p>
       </div>
     `;
     return;
   }
 
-  const item = getProgress(word.id);
-  item.seenCount += 1;
-  saveProgress();
-
   box.innerHTML = `
-    <div class="study-card">
-      <div class="meta">${currentCardIndex + 1} / ${currentLesson.length} · ${statusLabel(item.status)}</div>
+    <div class="word-board-wrap">
+      ${renderBoardPhraseCard(boardPhrase)}
 
-      <div class="word-title-row">
-        ${getSpeakableChinese(word.chinese, "chinese-big")}
-        ${getWritingShortcutButton(word.id)}
+      <div class="board-header">
+        <h3>Живая доска новых иероглифов</h3>
+        <p class="muted">
+          На доске появляются только новые слова. Один клик — озвучить и открыть значение.
+          Двойной клик или ✎ — перейти к письму; после этого слово уйдёт в “изучаются”.
+        </p>
       </div>
 
-      ${showAnswer ? `
-        <div class="pinyin">${escapeHTML(word.pinyin)}</div>
-        <div class="meaning">${escapeHTML(word.meaning)}</div>
-        <p class="meta">type: ${escapeHTML(word.type)} · mastery: ${item.mastery}/5</p>
-      ` : `<p class="muted">Вспомни pinyin и перевод, потом нажми “Показать ответ”.</p>`}
+      <div id="floatingWordBoard" class="floating-word-board">
+        ${boardWords.map((word, index) => {
+          const position = boardPositions[index % boardPositions.length];
+          const item = getProgress(word.id);
 
-      <div class="button-row" style="justify-content:center">
-        ${showAnswer ? `
-          <button class="secondary" onclick="markCardHard()">Повторить</button>
-          <button onclick="markCardKnown()">Знаю</button>
-        ` : `<button onclick="renderCard(true)">Показать ответ</button>`}
+          return `
+            <div
+              class="floating-tile status-${item.status}"
+              style="
+                top: ${position.top}%;
+                left: ${position.left}%;
+                transform: translate(-50%, -50%) rotate(${position.rotate}deg);
+              "
+              data-word-id="${escapeHTML(word.id)}"
+              data-speak="${escapeHTML(word.chinese)}"
+              onclick="handleBoardTileClick(this)"
+              ondblclick="moveBoardWordToWriting(event, '${escapeHTML(word.id)}')"
+            >
+              <div class="tile-hanzi">${escapeHTML(word.chinese)}</div>
+
+              <div class="tile-popup">
+                <button
+                  class="tile-write-button"
+                  onclick="moveBoardWordToWriting(event, '${escapeHTML(word.id)}')"
+                  title="Писать иероглиф"
+                  aria-label="Писать иероглиф"
+                >
+                  ✎
+                </button>
+
+                <div class="popup-chinese">${escapeHTML(word.chinese)}</div>
+                <div class="popup-pinyin">${escapeHTML(word.pinyin)}</div>
+                <div class="popup-meaning">${escapeHTML(word.meaning)}</div>
+                <div class="popup-meta">
+                  ${statusLabel(item.status)} · mastery ${item.mastery}/5
+                </div>
+              </div>
+            </div>
+          `;
+        }).join("")}
       </div>
     </div>
   `;
 }
+
+function openBoardTile(element) {
+  document.querySelectorAll(".floating-tile.open").forEach(tile => {
+    if (tile !== element) {
+      tile.classList.remove("open");
+    }
+  });
+
+  element.classList.add("open");
+}
+
+function handleBoardTileClick(element) {
+  if (boardClickTimer) {
+    clearTimeout(boardClickTimer);
+  }
+
+  boardClickTimer = setTimeout(function() {
+    openBoardTile(element);
+    speakFromElement(element);
+  }, 220);
+}
+
+function moveBoardWordToWriting(event, wordId) {
+  if (event) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
+
+  if (boardClickTimer) {
+    clearTimeout(boardClickTimer);
+    boardClickTimer = null;
+  }
+
+  const item = getProgress(wordId);
+  item.status = "learning";
+  item.mastery = Math.max(item.mastery, 1);
+  saveProgress();
+  renderStats();
+
+  openWritingForWord(wordId);
+}
+
+function getStudyBoardWords() {
+  const words = getAllWords();
+  const newWords = shuffle(words.filter(word => getProgress(word.id).status === "new"));
+
+  return newWords.slice(0, 10);
+}
+
+function getBoardSuggestionPhrase(boardWords) {
+  const phrases = getAllPhrases()
+    .map(normalizePhrase)
+    .filter(phrase => phrase.tokens.length);
+
+  if (!phrases.length) return null;
+
+  const boardWordIds = new Set(boardWords.map(word => word.id));
+  const connectedPhrases = phrases.filter(phrase =>
+    phrase.tokens.some(token => token.wordId && boardWordIds.has(token.wordId))
+  );
+
+  if (
+    currentBoardPhrase &&
+    phrases.some(phrase => phrase.id === currentBoardPhrase.id)
+  ) {
+    return currentBoardPhrase;
+  }
+
+  currentBoardPhrase = chooseRandom(connectedPhrases.length ? connectedPhrases : phrases);
+  return currentBoardPhrase;
+}
+
+function nextBoardPhrase() {
+  currentBoardPhrase = null;
+  renderCard();
+}
+
+function getPhraseChineseText(phrase) {
+  if (!phrase) return "";
+
+  const normalized = normalizePhrase(phrase);
+
+  return normalized.tokens.map(token => {
+    if (token.text) return token.text;
+
+    const word = getWordById(token.wordId);
+    return word ? word.chinese : "";
+  }).join("");
+}
+
+function renderBoardPhraseCard(phrase) {
+  if (!phrase) {
+    return `
+      <div class="board-phrase-card">
+        <p class="muted">Пока нет готовых предложений в phrases.js.</p>
+      </div>
+    `;
+  }
+
+  const chineseText = getPhraseChineseText(phrase);
+
+  return `
+    <div class="board-phrase-card">
+      <div class="board-phrase-topline">
+        <span class="meta">Предложение дня</span>
+        <button
+          class="secondary small-button"
+          type="button"
+          onclick="nextBoardPhrase()"
+        >
+          Другое
+        </button>
+      </div>
+
+      <div
+        class="board-phrase-chinese"
+        data-speak="${escapeHTML(chineseText)}"
+        onclick="speakFromElement(this)"
+        title="Нажми, чтобы прослушать предложение"
+      >
+        ${escapeHTML(chineseText)}
+      </div>
+
+      <div id="boardPhraseTranslation" class="board-phrase-translation hidden">
+        ${escapeHTML(phrase.translation || "Перевод пока не добавлен.")}
+      </div>
+
+      <div class="board-phrase-actions">
+        <button
+          type="button"
+          onclick="speakChinese('${escapeForInline(chineseText)}')"
+        >
+          Прослушать всё предложение
+        </button>
+
+        <button
+          class="secondary icon-action-button"
+          type="button"
+          onclick="openBoardPhraseInSentence()"
+          title="Построить это предложение"
+          aria-label="Построить это предложение"
+        >
+          🧩
+        </button>
+
+        <button
+          class="secondary small-button"
+          type="button"
+          onclick="toggleBoardPhraseTranslation()"
+        >
+          Показать перевод
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function toggleBoardPhraseTranslation() {
+  const box = document.getElementById("boardPhraseTranslation");
+  if (!box) return;
+
+  box.classList.toggle("hidden");
+}
+
+function openBoardPhraseInSentence() {
+  const phrase = currentBoardPhrase || getBoardSuggestionPhrase(getStudyBoardWords());
+
+  if (!phrase) {
+    alert("Пока нет предложения для тренировки.");
+    return;
+  }
+
+  currentPhrase = normalizePhrase(phrase);
+  selectedBankIndexes = [];
+  sentenceAnswer = [];
+  currentMemoryExercise = "sentence";
+
+  showMode("sentences");
+}
+
 
 function markCardKnown() {
   const word = getCurrentCardWord();
@@ -405,7 +661,7 @@ function markCardHard() {
 }
 
 // =====================================================
-// WRITING MODE — Hanzi Writer
+// БЛОК 2: ПИСАТЬ ИЕРОГЛИФЫ — Hanzi Writer
 // =====================================================
 
 function openWritingForWord(wordId) {
@@ -616,9 +872,524 @@ function markWritingDone() {
   showWritingMessage(`Письмо для слова ${word.chinese} отмечено как выполненное.`, "ok");
 }
 
+
 // =====================================================
-// SENTENCES MODE
+// БЛОК 3: ЗАПОМИНАНИЕ — упражнения памяти
 // =====================================================
+
+function setMemoryExercise(exerciseName) {
+  currentMemoryExercise = exerciseName;
+  renderMemory();
+}
+
+function renderMemory() {
+  document.querySelectorAll(".memory-exercise").forEach(section => section.classList.add("hidden"));
+  document.querySelectorAll(".memory-tabs button").forEach(button => button.classList.remove("active"));
+
+  const section = document.getElementById("memoryExercise" + capitalizeFirst(currentMemoryExercise));
+  const tab = document.getElementById("memory-tab-" + currentMemoryExercise);
+
+  if (section) section.classList.remove("hidden");
+  if (tab) tab.classList.add("active");
+
+  if (currentMemoryExercise === "sentence") {
+    if (!currentPhrase) nextPhrase();
+    else renderSentence();
+  }
+
+  if (currentMemoryExercise === "match") {
+    if (!currentMatchTask) nextMatchExercise();
+    else renderMatchExercise();
+  }
+
+  if (currentMemoryExercise === "recall") {
+    if (!currentRecallTask) nextRecallExercise();
+    else renderRecallExercise();
+  }
+
+  if (currentMemoryExercise === "draw") {
+    if (!currentDrawTask) nextDrawExercise();
+    else renderDrawExercise();
+  }
+}
+
+function capitalizeFirst(text) {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function getMemoryWords() {
+  const words = getAllWords();
+  const learning = words.filter(word => {
+    const status = getProgress(word.id).status;
+    return status === "learning" || status === "review";
+  });
+
+  return learning.length >= 4 ? learning : words;
+}
+
+function markMemorySuccess(wordId) {
+  const item = getProgress(wordId);
+  item.mastery = Math.min(5, item.mastery + 1);
+  updateStatus(wordId);
+  renderStats();
+}
+
+function markMemoryMistake(wordId) {
+  const item = getProgress(wordId);
+  item.wrongCount += 1;
+  item.mastery = Math.max(1, item.mastery);
+  updateStatus(wordId);
+  renderStats();
+}
+
+function sendWordBackToNew(wordId) {
+  const item = getProgress(wordId);
+  item.status = "new";
+  item.mastery = 0;
+  item.cardDone = false;
+  item.writingDone = false;
+  item.sentenceDone = false;
+  item.wrongCount += 1;
+  saveProgress();
+  renderStats();
+}
+
+// ---------- A) Подбор слов: соединить иероглифы с переводами ----------
+
+function nextMatchExercise() {
+  const words = shuffle(getMemoryWords()).slice(0, 5);
+
+  if (words.length < 2) {
+    currentMatchTask = null;
+    renderMatchExercise();
+    return;
+  }
+
+  currentMatchTask = {
+    pairs: words.map(word => ({
+      id: word.id,
+      chinese: word.chinese,
+      meaning: word.meaning,
+      matched: false
+    })),
+    meaningOrder: shuffle(words.map(word => word.id)),
+    chineseOrder: shuffle(words.map(word => word.id)),
+    selectedMeaningId: null,
+    selectedChineseId: null
+  };
+
+  renderMatchExercise();
+}
+
+function renderMatchExercise() {
+  const taskBox = document.getElementById("matchTaskBox");
+  const board = document.getElementById("matchOptionsBox");
+  const message = document.getElementById("matchMessage");
+
+  if (!taskBox || !board || !message) return;
+
+  if (!currentMatchTask) {
+    taskBox.innerHTML = `<p class="muted">Недостаточно слов для упражнения.</p>`;
+    board.innerHTML = "";
+    return;
+  }
+
+  taskBox.innerHTML = `
+    <div class="memory-question">Соедини пары</div>
+    <p class="muted">
+      Слева — переводы. Справа — китайские слова. Нажми перевод и соответствующий иероглиф.
+    </p>
+  `;
+
+  board.innerHTML = `
+    <div class="match-column">
+      <h3>Переводы</h3>
+      ${currentMatchTask.meaningOrder.map(wordId => renderMatchMeaningButton(wordId)).join("")}
+    </div>
+
+    <div class="match-column">
+      <h3>Иероглифы</h3>
+      ${currentMatchTask.chineseOrder.map(wordId => renderMatchChineseButton(wordId)).join("")}
+    </div>
+  `;
+
+  message.textContent = "";
+  message.className = "message";
+}
+
+function renderMatchMeaningButton(wordId) {
+  const pair = getMatchPair(wordId);
+  if (!pair) return "";
+
+  const classes = [
+    "match-card",
+    "meaning-card",
+    pair.matched ? "matched" : "",
+    currentMatchTask.selectedMeaningId === wordId ? "selected" : ""
+  ].filter(Boolean).join(" ");
+
+  return `
+    <button
+      class="${classes}"
+      onclick="selectMatchMeaning('${escapeHTML(wordId)}')"
+      ${pair.matched ? "disabled" : ""}
+    >
+      ${escapeHTML(pair.meaning)}
+    </button>
+  `;
+}
+
+function renderMatchChineseButton(wordId) {
+  const pair = getMatchPair(wordId);
+  if (!pair) return "";
+
+  const classes = [
+    "match-card",
+    "chinese-card",
+    pair.matched ? "matched" : "",
+    currentMatchTask.selectedChineseId === wordId ? "selected" : ""
+  ].filter(Boolean).join(" ");
+
+  return `
+    <button
+      class="${classes}"
+      data-speak="${escapeHTML(pair.chinese)}"
+      onclick="speakFromElement(this); selectMatchChinese('${escapeHTML(wordId)}')"
+      onmouseenter="speakFromElement(this, true)"
+      ${pair.matched ? "disabled" : ""}
+    >
+      ${escapeHTML(pair.chinese)}
+    </button>
+  `;
+}
+
+function getMatchPair(wordId) {
+  if (!currentMatchTask) return null;
+  return currentMatchTask.pairs.find(pair => pair.id === wordId);
+}
+
+function selectMatchMeaning(wordId) {
+  if (!currentMatchTask) return;
+
+  const pair = getMatchPair(wordId);
+  if (!pair || pair.matched) return;
+
+  currentMatchTask.selectedMeaningId = wordId;
+  checkMatchPairIfReady();
+}
+
+function selectMatchChinese(wordId) {
+  if (!currentMatchTask) return;
+
+  const pair = getMatchPair(wordId);
+  if (!pair || pair.matched) return;
+
+  currentMatchTask.selectedChineseId = wordId;
+  checkMatchPairIfReady();
+}
+
+function checkMatchPairIfReady() {
+  const message = document.getElementById("matchMessage");
+  if (!currentMatchTask || !message) return;
+
+  const meaningId = currentMatchTask.selectedMeaningId;
+  const chineseId = currentMatchTask.selectedChineseId;
+
+  if (!meaningId || !chineseId) {
+    renderMatchExercise();
+    return;
+  }
+
+  if (meaningId === chineseId) {
+    const pair = getMatchPair(chineseId);
+    pair.matched = true;
+
+    markMemorySuccess(chineseId);
+
+    currentMatchTask.selectedMeaningId = null;
+    currentMatchTask.selectedChineseId = null;
+
+    renderMatchExercise();
+
+    const allMatched = currentMatchTask.pairs.every(item => item.matched);
+
+    if (allMatched) {
+      message.innerHTML = `
+        <div class="reward-box">
+          <div class="reward-stars">✨ ✨ ✨</div>
+          <strong>Все пары собраны правильно.</strong>
+          <p>Отличная память: слова остаются в обучении и становятся сильнее.</p>
+        </div>
+      `;
+      message.className = "message ok";
+      setTimeout(nextMatchExercise, 850);
+    } else {
+      message.textContent = "Правильно. Продолжай.";
+      message.className = "message ok";
+    }
+
+    return;
+  }
+
+  sendWordBackToNew(chineseId);
+  sendWordBackToNew(meaningId);
+
+  const correctPair = getMatchPair(chineseId);
+
+  message.textContent = `Не совпало. Для ${correctPair.chinese} правильный перевод: ${correctPair.meaning}`;
+  message.className = "message error";
+
+  setTimeout(function() {
+    if (!currentMatchTask) return;
+    currentMatchTask.selectedMeaningId = null;
+    currentMatchTask.selectedChineseId = null;
+    renderMatchExercise();
+  }, 950);
+}
+
+// ---------- B) Вспомнить иероглиф / pinyin ----------
+
+function nextRecallExercise() {
+  const words = getMemoryWords();
+
+  if (!words.length) {
+    currentRecallTask = null;
+    renderRecallExercise();
+    return;
+  }
+
+  const word = chooseRandom(words);
+  const taskTypes = ["meaningToChinese", "chineseToPinyin"];
+  const taskType = chooseRandom(taskTypes);
+
+  currentRecallTask = {
+    word,
+    taskType
+  };
+
+  renderRecallExercise();
+}
+
+function renderRecallExercise() {
+  const taskBox = document.getElementById("recallTaskBox");
+  const input = document.getElementById("recallInput");
+  const message = document.getElementById("recallMessage");
+
+  if (!taskBox || !input || !message) return;
+
+  input.value = "";
+  message.textContent = "";
+  message.className = "message";
+
+  if (!currentRecallTask) {
+    taskBox.innerHTML = `<p class="muted">Нет слов для упражнения.</p>`;
+    return;
+  }
+
+  const { word, taskType } = currentRecallTask;
+
+  if (taskType === "meaningToChinese") {
+    taskBox.innerHTML = `
+      <div class="memory-question">${escapeHTML(word.meaning)}</div>
+      <p class="muted">Введи китайский иероглиф или слово вручную. Звук здесь отключён.</p>
+    `;
+    input.placeholder = "Например: 我";
+  }
+
+  if (taskType === "chineseToPinyin") {
+    taskBox.innerHTML = `
+      <div class="memory-question memory-question-chinese-no-sound">${escapeHTML(word.chinese)}</div>
+      <p class="muted">Введи pinyin. Звук здесь отключён, чтобы ты вспоминала сама.</p>
+    `;
+    input.placeholder = "Например: ni hao";
+  }
+
+  input.focus();
+}
+
+function checkRecallAnswer() {
+  const input = document.getElementById("recallInput");
+  const message = document.getElementById("recallMessage");
+
+  if (!currentRecallTask || !input || !message) return;
+
+  const answer = input.value.trim();
+  const { word, taskType } = currentRecallTask;
+
+  let correct = false;
+  let correctAnswer = "";
+
+  if (taskType === "meaningToChinese") {
+    correctAnswer = word.chinese;
+    correct = answer === word.chinese;
+  }
+
+  if (taskType === "chineseToPinyin") {
+    correctAnswer = word.pinyin;
+    correct = normalizePinyinAnswer(answer) === normalizePinyinAnswer(word.pinyin);
+  }
+
+  if (correct) {
+    markMemorySuccess(word.id);
+    message.textContent = "Правильно.";
+    message.className = "message ok";
+    setTimeout(nextRecallExercise, 650);
+    return;
+  }
+
+  markMemoryMistake(word.id);
+  message.textContent = `Пока неправильно. Правильный ответ: ${correctAnswer}`;
+  message.className = "message error";
+}
+
+function normalizePinyinAnswer(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replaceAll("ü", "u")
+    .replace(/\s+/g, "")
+    .trim();
+}
+
+// ---------- C) Нарисовать без подсказок ----------
+
+function nextDrawExercise() {
+  const words = getMemoryWords().filter(word => getCharactersFromWord(word).length > 0);
+
+  if (!words.length) {
+    currentDrawTask = null;
+    renderDrawExercise();
+    return;
+  }
+
+  const word = chooseRandom(words);
+  const characters = getCharactersFromWord(word);
+  const character = chooseRandom(characters);
+
+  currentDrawTask = {
+    word,
+    character
+  };
+
+  renderDrawExercise();
+}
+
+function renderDrawExercise() {
+  const taskBox = document.getElementById("drawTaskBox");
+  const target = document.getElementById("memoryHanziTarget");
+  const message = document.getElementById("drawMessage");
+
+  if (!taskBox || !target || !message) return;
+
+  target.innerHTML = "";
+  memoryHanziWriter = null;
+  message.textContent = "";
+  message.className = "message";
+
+  if (!currentDrawTask) {
+    taskBox.innerHTML = `<p class="muted">Нет иероглифов для письма.</p>`;
+    target.innerHTML = "";
+    return;
+  }
+
+  taskBox.innerHTML = `
+    <div class="memory-question">${escapeHTML(currentDrawTask.word.meaning)}</div>
+    <p class="muted">
+      Pinyin: ${escapeHTML(currentDrawTask.word.pinyin)}.
+      Вспомни нужный иероглиф и напиши его без контура.
+    </p>
+  `;
+
+  loadMemoryHanziWriter();
+}
+
+function loadMemoryHanziWriter() {
+  const target = document.getElementById("memoryHanziTarget");
+  const message = document.getElementById("drawMessage");
+
+  if (!target || !currentDrawTask) return;
+
+  target.innerHTML = "";
+  memoryHanziWriter = null;
+
+  if (typeof HanziWriter === "undefined") {
+    message.textContent = "Hanzi Writer не загрузился. Проверь интернет.";
+    message.className = "message error";
+    return;
+  }
+
+  const size = Math.min(340, Math.max(260, target.clientWidth || 320));
+
+  target.style.width = size + "px";
+  target.style.height = size + "px";
+
+  memoryHanziWriter = HanziWriter.create("memoryHanziTarget", currentDrawTask.character, {
+    width: size,
+    height: size,
+    padding: 24,
+    showOutline: false,
+    showCharacter: false,
+    strokeAnimationSpeed: 1,
+    delayBetweenStrokes: 180,
+    drawingWidth: 34,
+    radicalColor: "#6f3fd8",
+
+    onLoadCharDataSuccess: function() {
+      startMemoryDrawQuiz();
+    },
+
+    onLoadCharDataError: function() {
+      message.textContent = `Не удалось загрузить данные для иероглифа.`;
+      message.className = "message error";
+    }
+  });
+}
+
+function startMemoryDrawQuiz() {
+  const message = document.getElementById("drawMessage");
+
+  if (!memoryHanziWriter || !currentDrawTask) {
+    if (message) {
+      message.textContent = "Сначала выбери задание.";
+      message.className = "message error";
+    }
+    return;
+  }
+
+  message.textContent = "Пиши иероглиф. Приложение проверит черты.";
+  message.className = "message";
+
+  memoryHanziWriter.quiz({
+    showHintAfterMisses: 3,
+    leniency: 1,
+
+    onCorrectStroke: function() {
+      message.textContent = "Правильно. Продолжай.";
+      message.className = "message ok";
+    },
+
+    onMistake: function(strokeData) {
+      message.textContent = `Ошибка в этой черте. Ошибок: ${strokeData.totalMistakes}`;
+      message.className = "message error";
+    },
+
+    onComplete: function(summaryData) {
+      markMemorySuccess(currentDrawTask.word.id);
+      message.textContent = `Готово. Иероглиф был: ${currentDrawTask.character}. Ошибок: ${summaryData.totalMistakes}`;
+      message.className = "message ok";
+    }
+  });
+}
+
+function escapeForInline(value) {
+  return String(value ?? "")
+    .replaceAll("\\", "\\\\")
+    .replaceAll("'", "\\'")
+    .replaceAll("\n", "\\n")
+    .replaceAll("\r", "");
+}
+
+
+// ---------- БЛОК 3A: Запоминание / строить предложения ----------
 
 function normalizePhrase(phrase) {
   const tokens = (phrase.tokens || []).filter(Boolean);
@@ -673,13 +1444,15 @@ function renderSentence() {
   const phraseText = document.getElementById("phraseText");
   const source = document.getElementById("phraseSource");
   const prompt = document.getElementById("sentencePrompt");
+  const translationBox = document.getElementById("sentenceTranslationBox");
   const message = document.getElementById("sentenceMessage");
   const infoBox = document.getElementById("wordInfoBox");
 
   if (!currentPhrase) {
     source.textContent = "Нет доступных фраз";
     phraseText.innerHTML = "";
-    prompt.textContent = "Проверь phrases.js: фразы должны ссылаться на слова из dictionary.js.";
+    prompt.innerHTML = "Проверь phrases.js: фразы должны ссылаться на слова из dictionary.js.";
+    if (translationBox) translationBox.innerHTML = "";
     renderSentenceBuild();
     renderWordBank();
     return;
@@ -687,7 +1460,50 @@ function renderSentence() {
 
   source.textContent = currentPhrase.source === "custom" ? "Личная фраза" : "Готовая фраза из phrases.js";
 
-  phraseText.innerHTML = currentPhrase.tokens.map(token => {
+  phraseText.innerHTML = `
+    <div class="sentence-hidden-source">
+      Правильная китайская фраза скрыта. Сначала попробуй собрать её сама.
+      <button class="secondary small-button" onclick="revealCorrectSentence()">Показать фразу</button>
+    </div>
+  `;
+
+  prompt.innerHTML = `
+    <div class="memory-question">Построй предложение из слов</div>
+    <p class="muted">
+      Перевод скрыт. Сначала попробуй вспомнить смысл и порядок слов.
+    </p>
+    <button class="secondary small-button" onclick="revealSentenceTranslation()">Показать перевод</button>
+  `;
+
+  if (translationBox) {
+    translationBox.classList.add("hidden");
+    translationBox.innerHTML = `
+      <strong>Перевод:</strong>
+      ${escapeHTML(currentPhrase.translation || "Перевод пока не добавлен.")}
+    `;
+  }
+
+  message.textContent = "";
+  message.className = "message";
+
+  if (!infoBox.innerHTML) infoBox.innerHTML = "";
+
+  renderSentenceBuild();
+  renderWordBank();
+}
+
+function revealSentenceTranslation() {
+  const box = document.getElementById("sentenceTranslationBox");
+  if (!box) return;
+
+  box.classList.remove("hidden");
+}
+
+function revealCorrectSentence() {
+  const box = document.getElementById("phraseText");
+  if (!box || !currentPhrase) return;
+
+  box.innerHTML = currentPhrase.tokens.map(token => {
     if (token.text) return `<span>${escapeHTML(token.text)}</span>`;
 
     const word = getWordById(token.wordId);
@@ -696,24 +1512,14 @@ function renderSentence() {
     const status = getProgress(word.id).status;
     return `
       <span
-        class="phrase-token ${status} speakable-chinese"
+        class="phrase-token ${status}"
         data-speak="${escapeHTML(word.chinese)}"
-        onclick="showWordInfoAndSpeak(this, '${escapeHTML(word.id)}')"
-        onmouseenter="speakFromElement(this, true)"
+        onclick="showWordInfo('${escapeHTML(word.id)}')"
       >
         ${escapeHTML(word.chinese)}
       </span>
     `;
   }).join("");
-
-  prompt.textContent = currentPhrase.prompt || `Собери: ${currentPhrase.translation}`;
-  message.textContent = "";
-  message.className = "message";
-
-  if (!infoBox.innerHTML) infoBox.innerHTML = "";
-
-  renderSentenceBuild();
-  renderWordBank();
 }
 
 function showWordInfo(wordId) {
@@ -754,10 +1560,8 @@ function renderWordBank() {
     const selected = selectedBankIndexes.includes(index);
     return `
       <span
-        class="word-chip ${selected ? "selected" : ""} speakable-chinese"
-        data-speak="${escapeHTML(wordText)}"
-        onclick="speakFromElement(this); addSentenceWord(${index})"
-        onmouseenter="speakFromElement(this, true)"
+        class="word-chip ${selected ? "selected" : ""}"
+        onclick="addSentenceWord(${index})"
       >
         ${escapeHTML(wordText)}
       </span>
@@ -785,10 +1589,9 @@ function renderSentenceBuild() {
 
   build.innerHTML = sentenceAnswer.map((word, index) => `
     <span
-      class="word-chip speakable-chinese"
-      data-speak="${escapeHTML(word)}"
-      onclick="speakFromElement(this); removeSentenceWord(${index})"
-      onmouseenter="speakFromElement(this, true)"
+      class="word-chip"
+      onclick="removeSentenceWord(${index})"
+      title="Нажми, чтобы убрать"
     >
       ${escapeHTML(word)}
     </span>
@@ -832,7 +1635,9 @@ function checkSentence() {
     });
 
     renderStats();
-    message.textContent = "Правильно. Переходим к следующей фразе.";
+    revealSentenceTranslation();
+    revealCorrectSentence();
+    message.textContent = "Правильно. Отлично: фраза собрана. Переходим к следующей.";
     message.className = "message ok";
     return true;
   }
@@ -898,8 +1703,9 @@ function addCustomPhrase() {
   nextPhrase();
 }
 
+
 // =====================================================
-// DICTIONARY MODE
+// БЛОК 4: СЛОВАРЬ
 // =====================================================
 
 function setDictionaryFilter(status) {
@@ -1008,6 +1814,248 @@ function addCustomWord() {
   renderDictionary();
 }
 
+// =====================================================
+// БЛОК 5: ПОНИМАНИЕ ТЕКСТА
+// =====================================================
+
+function getCurrentReadingText() {
+  if (!readingTexts.length) return null;
+
+  let text = readingTexts.find(item => item.id === currentReadingTextId);
+
+  if (!text) {
+    currentReadingTextId = readingTexts[0].id;
+    text = readingTexts[0];
+  }
+
+  return text;
+}
+
+function clearReadingEditor() {
+  const titleInput = document.getElementById("readingTitleInput");
+  const textInput = document.getElementById("readingTextInput");
+  const translationInput = document.getElementById("readingManualTranslationInput");
+  const message = document.getElementById("readingMessage");
+
+  if (titleInput) titleInput.value = "";
+  if (textInput) textInput.value = "";
+  if (translationInput) translationInput.value = "";
+
+  if (message) {
+    message.textContent = "";
+    message.className = "message";
+  }
+}
+
+function addReadingText() {
+  const titleInput = document.getElementById("readingTitleInput");
+  const textInput = document.getElementById("readingTextInput");
+  const translationInput = document.getElementById("readingManualTranslationInput");
+  const message = document.getElementById("readingMessage");
+
+  const title = titleInput ? titleInput.value.trim() : "";
+  const text = textInput ? textInput.value.trim() : "";
+  const manualTranslation = translationInput ? translationInput.value.trim() : "";
+
+  if (!text) {
+    message.textContent = "Сначала вставь китайский текст.";
+    message.className = "message error";
+    return;
+  }
+
+  const item = {
+    id: "reading_" + Date.now(),
+    title: title || makeReadingTitle(text),
+    text,
+    manualTranslation,
+    createdAt: new Date().toISOString()
+  };
+
+  readingTexts.unshift(item);
+  currentReadingTextId = item.id;
+  saveJSON(CUSTOM_TEXTS_KEY, readingTexts);
+
+  clearReadingEditor();
+  message.textContent = "Текст добавлен.";
+  message.className = "message ok";
+
+  renderReading();
+}
+
+function makeReadingTitle(text) {
+  const compact = text.replace(/\s+/g, " ").trim();
+  return compact.slice(0, 18) + (compact.length > 18 ? "..." : "");
+}
+
+function selectReadingText(textId) {
+  currentReadingTextId = textId;
+  renderReading();
+}
+
+function deleteReadingText(textId) {
+  const ok = confirm("Удалить этот текст?");
+  if (!ok) return;
+
+  readingTexts = readingTexts.filter(item => item.id !== textId);
+
+  if (currentReadingTextId === textId) {
+    currentReadingTextId = readingTexts.length ? readingTexts[0].id : null;
+  }
+
+  saveJSON(CUSTOM_TEXTS_KEY, readingTexts);
+  renderReading();
+}
+
+function speakCurrentReadingText() {
+  const item = getCurrentReadingText();
+
+  if (!item) {
+    alert("Сначала добавь или выбери текст.");
+    return;
+  }
+
+  speakChinese(item.text);
+}
+
+function renderReading() {
+  const list = document.getElementById("readingTextList");
+  const title = document.getElementById("currentReadingTitle");
+  const view = document.getElementById("readingTextView");
+  const translation = document.getElementById("readingTranslationBox");
+  const manual = document.getElementById("readingManualTranslationView");
+
+  if (!list || !title || !view || !translation || !manual) return;
+
+  if (!readingTexts.length) {
+    list.innerHTML = `<p class="muted">Пока нет добавленных текстов.</p>`;
+    title.textContent = "Текст не выбран";
+    view.innerHTML = `<p class="muted">Добавь первый китайский текст слева.</p>`;
+    translation.innerHTML = `<p class="muted">Здесь появятся найденные слова из словаря.</p>`;
+    manual.innerHTML = `<p class="muted">Здесь появится твой перевод или заметки.</p>`;
+    return;
+  }
+
+  list.innerHTML = readingTexts.map(item => `
+    <div class="reading-list-item ${item.id === currentReadingTextId ? "active" : ""}">
+      <button type="button" onclick="selectReadingText('${escapeHTML(item.id)}')">
+        ${escapeHTML(item.title)}
+      </button>
+      <button class="small-danger" type="button" onclick="deleteReadingText('${escapeHTML(item.id)}')">×</button>
+    </div>
+  `).join("");
+
+  const item = getCurrentReadingText();
+
+  title.textContent = item.title;
+  view.innerHTML = renderInteractiveReadingText(item.text);
+  translation.innerHTML = renderReadingStudyTranslation(item.text);
+  manual.innerHTML = item.manualTranslation
+    ? `<p>${escapeHTML(item.manualTranslation).replaceAll("\n", "<br>")}</p>`
+    : `<p class="muted">Ты не добавила свой перевод к этому тексту.</p>`;
+}
+
+function renderInteractiveReadingText(text) {
+  return Array.from(text).map(character => {
+    if (character === "\n") return "<br>";
+
+    if (isChineseCharacter(character)) {
+      const word = getWordByChinese(character);
+
+      return `
+        <span
+          class="reading-char ${word ? "known" : ""}"
+          data-speak="${escapeHTML(character)}"
+          onclick="speakFromElement(this); showReadingCharacterInfo('${escapeHTML(character)}')"
+          onmouseenter="speakFromElement(this, true)"
+          title="${word ? escapeHTML(word.pinyin + " — " + word.meaning) : "Нажми, чтобы озвучить"}"
+        >
+          ${escapeHTML(character)}
+        </span>
+      `;
+    }
+
+    return escapeHTML(character);
+  }).join("");
+}
+
+function showReadingCharacterInfo(character) {
+  const box = document.getElementById("readingTranslationBox");
+  const word = getWordByChinese(character);
+
+  if (!box) return;
+
+  if (!word) {
+    box.innerHTML = `
+      <div class="reading-character-card">
+        <div class="popup-chinese">${escapeHTML(character)}</div>
+        <p class="muted">Этого отдельного иероглифа пока нет в словаре.</p>
+      </div>
+      ${renderReadingStudyTranslation(getCurrentReadingText()?.text || "")}
+    `;
+    return;
+  }
+
+  box.innerHTML = `
+    <div class="reading-character-card">
+      <div class="word-title-row">
+        ${getSpeakableChinese(word.chinese, "chinese-big")}
+        ${getWritingShortcutButton(word.id)}
+      </div>
+      <div class="pinyin">${escapeHTML(word.pinyin)}</div>
+      <div class="meaning">${escapeHTML(word.meaning)}</div>
+      <p class="meta">type: ${escapeHTML(word.type)} · status: ${statusLabel(getProgress(word.id).status)}</p>
+    </div>
+    ${renderReadingStudyTranslation(getCurrentReadingText()?.text || "")}
+  `;
+}
+
+function renderReadingStudyTranslation(text) {
+  const matches = findKnownWordsInText(text);
+
+  if (!matches.length) {
+    return `
+      <p class="muted">
+        Учебный переводчик пока не нашёл знакомых слов. Добавь слова в словарь или попробуй другой текст.
+      </p>
+    `;
+  }
+
+  return `
+    <div class="known-word-list">
+      ${matches.map(word => `
+        <div class="known-word-row">
+          <div>
+            ${getSpeakableChinese(word.chinese, "reading-known-word")}
+            <span class="pinyin">${escapeHTML(word.pinyin)}</span>
+          </div>
+          <div>${escapeHTML(word.meaning)}</div>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function findKnownWordsInText(text) {
+  const words = getAllWords()
+    .filter(word => word.chinese && text.includes(word.chinese))
+    .sort((a, b) => b.chinese.length - a.chinese.length);
+
+  const seen = new Set();
+  const result = [];
+
+  words.forEach(word => {
+    if (seen.has(word.chinese)) return;
+    seen.add(word.chinese);
+    result.push(word);
+  });
+
+  return result.slice(0, 80);
+}
+
+// =====================================================
+// ФИНАЛ: сброс, общий рендер, запуск приложения
+// =====================================================
+
 function resetProgress() {
   const ok = confirm("Сбросить прогресс на этом устройстве?");
   if (!ok) return;
@@ -1027,6 +2075,8 @@ function renderAll() {
 
   if (currentMode === "dictionary") renderDictionary();
   if (currentMode === "cards") renderCard();
+  if (currentMode === "sentences") renderMemory();
+  if (currentMode === "reading") renderReading();
 }
 
 function boot() {
