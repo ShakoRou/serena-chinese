@@ -251,6 +251,7 @@ function getWritingShortcutButton(wordId) {
     </button>
   `;
 }
+
 let selectedChineseVoice = null;
 let lastSpokenText = "";
 let lastSpokenTime = 0;
@@ -331,6 +332,7 @@ function showWordInfoAndSpeak(element, wordId) {
   showWordInfo(wordId);
   speakFromElement(element);
 }
+
 function renderCard(showAnswer = false) {
   const box = document.getElementById("cardBox");
   const word = getCurrentCardWord();
@@ -354,7 +356,7 @@ function renderCard(showAnswer = false) {
       <div class="meta">${currentCardIndex + 1} / ${currentLesson.length} · ${statusLabel(item.status)}</div>
 
       <div class="word-title-row">
-        <div class="chinese-big">${escapeHTML(word.chinese)}</div>
+        ${getSpeakableChinese(word.chinese, "chinese-big")}
         ${getWritingShortcutButton(word.id)}
       </div>
 
@@ -433,11 +435,11 @@ function renderWriting() {
   writingCharacters = getCharactersFromWord(word);
   writingCharacterIndex = 0;
 
- wordBox.innerHTML = `
-  ${getSpeakableChinese(word.chinese, "writing-main-chinese")}
-  <span class="pinyin">${escapeHTML(word.pinyin)}</span>
-  <div class="meaning">${escapeHTML(word.meaning)}</div>
-`;
+  wordBox.innerHTML = `
+    ${getSpeakableChinese(word.chinese, "writing-main-chinese")}
+    <span class="pinyin">${escapeHTML(word.pinyin)}</span>
+    <div class="meaning">${escapeHTML(word.meaning)}</div>
+  `;
 
   renderWritingCharacterButtons();
   loadCurrentHanziCharacter();
@@ -459,16 +461,16 @@ function renderWritingCharacterButtons() {
     return;
   }
 
-box.innerHTML = writingCharacters.map((character, index) => `
-  <button
-    class="character-button ${index === writingCharacterIndex ? "active" : ""}"
-    data-speak="${escapeHTML(character)}"
-    onclick="selectWritingCharacter(${index}); speakFromElement(this)"
-    onmouseenter="speakFromElement(this, true)"
-  >
-    ${escapeHTML(character)}
-  </button>
-`).join("");
+  box.innerHTML = writingCharacters.map((character, index) => `
+    <button
+      class="character-button ${index === writingCharacterIndex ? "active" : ""}"
+      data-speak="${escapeHTML(character)}"
+      onclick="selectWritingCharacter(${index}); speakFromElement(this)"
+      onmouseenter="speakFromElement(this, true)"
+    >
+      ${escapeHTML(character)}
+    </button>
+  `).join("");
 }
 
 function selectWritingCharacter(index) {
@@ -693,15 +695,16 @@ function renderSentence() {
 
     const status = getProgress(word.id).status;
     return `
-  <span
-    class="phrase-token ${status} speakable-chinese"
-    data-speak="${escapeHTML(word.chinese)}"
-    onclick="showWordInfoAndSpeak(this, '${escapeHTML(word.id)}')"
-    onmouseenter="speakFromElement(this, true)"
-  >
-    ${escapeHTML(word.chinese)}
-  </span>
-`;
+      <span
+        class="phrase-token ${status} speakable-chinese"
+        data-speak="${escapeHTML(word.chinese)}"
+        onclick="showWordInfoAndSpeak(this, '${escapeHTML(word.id)}')"
+        onmouseenter="speakFromElement(this, true)"
+      >
+        ${escapeHTML(word.chinese)}
+      </span>
+    `;
+  }).join("");
 
   prompt.textContent = currentPhrase.prompt || `Собери: ${currentPhrase.translation}`;
   message.textContent = "";
@@ -721,10 +724,10 @@ function showWordInfo(wordId) {
 
   document.getElementById("wordInfoBox").innerHTML = `
     <div class="word-info-card">
-     <div class="word-title-row">
-  ${getSpeakableChinese(word.chinese, "chinese-big")}
-  ${getWritingShortcutButton(word.id)}
-</div>
+      <div class="word-title-row">
+        ${getSpeakableChinese(word.chinese, "chinese-big")}
+        ${getWritingShortcutButton(word.id)}
+      </div>
       <div class="pinyin">${escapeHTML(word.pinyin)}</div>
       <div class="meaning">${escapeHTML(word.meaning)}</div>
       <p class="meta">type: ${escapeHTML(word.type)} · status: ${statusLabel(item.status)} · mastery: ${item.mastery}/5</p>
@@ -749,16 +752,16 @@ function renderWordBank() {
 
   bank.innerHTML = currentPhrase.bank.map((wordText, index) => {
     const selected = selectedBankIndexes.includes(index);
-   return `
-  <span
-    class="word-chip ${selected ? "selected" : ""} speakable-chinese"
-    data-speak="${escapeHTML(wordText)}"
-    onclick="speakFromElement(this); addSentenceWord(${index})"
-    onmouseenter="speakFromElement(this, true)"
-  >
-    ${escapeHTML(wordText)}
-  </span>
-`;
+    return `
+      <span
+        class="word-chip ${selected ? "selected" : ""} speakable-chinese"
+        data-speak="${escapeHTML(wordText)}"
+        onclick="speakFromElement(this); addSentenceWord(${index})"
+        onmouseenter="speakFromElement(this, true)"
+      >
+        ${escapeHTML(wordText)}
+      </span>
+    `;
   }).join("");
 }
 
@@ -781,15 +784,15 @@ function renderSentenceBuild() {
   }
 
   build.innerHTML = sentenceAnswer.map((word, index) => `
-  <span
-    class="word-chip speakable-chinese"
-    data-speak="${escapeHTML(word)}"
-    onclick="speakFromElement(this); removeSentenceWord(${index})"
-    onmouseenter="speakFromElement(this, true)"
-  >
-    ${escapeHTML(word)}
-  </span>
-`).join("");
+    <span
+      class="word-chip speakable-chinese"
+      data-speak="${escapeHTML(word)}"
+      onclick="speakFromElement(this); removeSentenceWord(${index})"
+      onmouseenter="speakFromElement(this, true)"
+    >
+      ${escapeHTML(word)}
+    </span>
+  `).join("");
 }
 
 function removeSentenceWord(answerIndex) {
@@ -953,9 +956,9 @@ function renderDictionary() {
     return `
       <div class="word-row">
         <div class="word-title-row">
-  ${getSpeakableChinese(word.chinese, "chinese")}
-  ${getWritingShortcutButton(word.id)}
-</div>
+          ${getSpeakableChinese(word.chinese, "chinese")}
+          ${getWritingShortcutButton(word.id)}
+        </div>
         <div class="pinyin">${escapeHTML(word.pinyin)}</div>
         <div>${escapeHTML(word.meaning)}</div>
         <p class="meta">id: ${escapeHTML(word.id)}<br>type: ${escapeHTML(word.type)}<br>status: ${statusLabel(item.status)} · mastery: ${item.mastery}/5</p>
