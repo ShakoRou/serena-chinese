@@ -428,3 +428,22 @@ input, select {
 #hanziTarget {
   overflow: hidden;
 }
+.speakable-chinese {
+  cursor: pointer;
+  border-radius: 16px;
+  padding: 4px 8px;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.speakable-chinese:hover {
+  background: rgba(216, 236, 255, 0.8);
+  transform: translateY(-1px);
+}
+
+.writing-main-chinese {
+  display: inline-block;
+  font-size: 40px;
+  font-weight: 900;
+  color: #2b1452;
+  margin-bottom: 6px;
+}
