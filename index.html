@@ -13,7 +13,7 @@
         <p class="eyebrow">Serena Chinese</p>
         <h1>Учить китайский по-своему</h1>
         <p class="muted">
-          Карточки, письмо иероглифов, фразы, словарь и личный прогресс.
+          Живая доска слов, письмо иероглифов, запоминание, словарь, понимание текста и личный прогресс.
         </p>
       </div>
       <div class="hero-buttons">
@@ -28,15 +28,22 @@
     <nav class="tabs panel">
       <button id="tab-cards" onclick="showMode('cards')">Учить слова</button>
       <button id="tab-writing" onclick="showMode('writing')">Писать иероглифы</button>
-      <button id="tab-sentences" onclick="showMode('sentences')">Строить предложения</button>
+      <button id="tab-sentences" onclick="showMode('sentences')">Запоминание</button>
       <button id="tab-dictionary" onclick="showMode('dictionary')">Словарь</button>
+      <button id="tab-reading" onclick="showMode('reading')">Понимание текста</button>
     </nav>
 
+    <!-- =====================================================
+         БЛОК 1: Учить слова
+         ===================================================== -->
     <section id="cardsMode" class="mode-section panel">
       <h2>Учить слова</h2>
       <div id="cardBox"></div>
     </section>
 
+    <!-- =====================================================
+         БЛОК 2: Писать иероглифы
+         ===================================================== -->
     <section id="writingMode" class="mode-section panel hidden">
       <h2>Писать иероглифы</h2>
       <p class="muted">
@@ -61,34 +68,135 @@
       </div>
     </section>
 
+    <!-- =====================================================
+         БЛОК 3: Запоминание
+         ===================================================== -->
     <section id="sentencesMode" class="mode-section panel hidden">
-      <h2>Строить предложения</h2>
-      <p id="phraseSource" class="meta"></p>
+      <h2>Запоминание</h2>
 
-      <div id="phraseText" class="phrase-text"></div>
-      <div id="wordInfoBox"></div>
-
-      <h3 id="sentencePrompt"></h3>
-      <div id="sentenceBuild" class="sentence-build"></div>
-      <div id="wordBank" class="word-bank"></div>
-      <div id="sentenceMessage" class="message"></div>
-
-      <div class="button-row">
-        <button class="secondary" onclick="clearSentence()">Очистить</button>
-        <button onclick="nextPhraseAction()">Следующая фраза</button>
+      <div class="memory-tabs">
+        <button id="memory-tab-sentence" class="secondary active" type="button" onclick="setMemoryExercise('sentence')">Строить предложения</button>
+        <button id="memory-tab-match" class="secondary" type="button" onclick="setMemoryExercise('match')">Подбор слов</button>
+        <button id="memory-tab-recall" class="secondary" type="button" onclick="setMemoryExercise('recall')">Вспомнить иероглиф</button>
+        <button id="memory-tab-draw" class="secondary" type="button" onclick="setMemoryExercise('draw')">Нарисовать без подсказок</button>
       </div>
 
-      <details class="add-box">
-        <summary>Добавить свою фразу</summary>
-        <p class="muted">Пиши китайские слова через пробел. Например: 我 喜欢 茶</p>
-        <input id="customPhraseChinese" placeholder="我 喜欢 茶">
-        <input id="customPhraseTranslation" placeholder="Перевод фразы">
-        <input id="customPhraseExplanation" placeholder="Короткое объяснение">
-        <button onclick="addCustomPhrase()">Добавить фразу</button>
-        <div id="customPhraseMessage" class="message"></div>
-      </details>
+      <section id="memoryExerciseSentence" class="memory-exercise">
+        <p class="muted">Собери правильный порядок слов во фразе.</p>
+
+        <p id="phraseSource" class="meta"></p>
+
+        <div id="phraseText" class="phrase-text"></div>
+        <div id="wordInfoBox"></div>
+
+        <div id="sentencePrompt" class="sentence-prompt-card"></div>
+        <div id="sentenceTranslationBox" class="sentence-translation-box hidden"></div>
+        <div id="sentenceBuild" class="sentence-build"></div>
+        <div id="wordBank" class="word-bank"></div>
+        <div id="sentenceMessage" class="message"></div>
+
+        <div class="button-row">
+          <button class="secondary" onclick="clearSentence()">Очистить</button>
+          <button onclick="nextPhraseAction()">Следующая фраза</button>
+        </div>
+
+        <details class="add-box">
+          <summary>Добавить свою фразу</summary>
+          <p class="muted">Пиши китайские слова через пробел. Например: 我 喜欢 茶</p>
+          <input id="customPhraseChinese" placeholder="我 喜欢 茶">
+          <input id="customPhraseTranslation" placeholder="Перевод фразы">
+          <input id="customPhraseExplanation" placeholder="Короткое объяснение">
+          <button onclick="addCustomPhrase()">Добавить фразу</button>
+          <div id="customPhraseMessage" class="message"></div>
+        </details>
+      </section>
+
+      <section id="memoryExerciseMatch" class="memory-exercise hidden">
+        <p class="muted">
+          Соедини китайские слова справа с правильными переводами слева. Pinyin здесь больше не используется.
+        </p>
+        <div id="matchTaskBox" class="memory-task-box"></div>
+        <div id="matchOptionsBox" class="match-board"></div>
+        <div id="matchMessage" class="message"></div>
+        <div class="button-row">
+          <button onclick="nextMatchExercise()">Новый набор</button>
+        </div>
+      </section>
+
+      <section id="memoryExerciseRecall" class="memory-exercise hidden">
+        <p class="muted">Вспомни ответ и введи его вручную.</p>
+        <div id="recallTaskBox" class="memory-task-box"></div>
+        <input id="recallInput" placeholder="Введи ответ здесь..." onkeydown="if(event.key === 'Enter') checkRecallAnswer()">
+        <div id="recallMessage" class="message"></div>
+        <div class="button-row">
+          <button onclick="checkRecallAnswer()">Проверить</button>
+          <button class="secondary" onclick="nextRecallExercise()">Следующее</button>
+        </div>
+      </section>
+
+      <section id="memoryExerciseDraw" class="memory-exercise hidden">
+        <p class="muted">Вспомни и напиши иероглиф без контура и без готового символа.</p>
+        <div id="drawTaskBox" class="memory-task-box"></div>
+        <div id="memoryHanziTarget" class="memory-hanzi-target"></div>
+        <div id="drawMessage" class="message"></div>
+        <div class="button-row">
+          <button onclick="startMemoryDrawQuiz()">Начать проверку</button>
+          <button class="secondary" onclick="nextDrawExercise()">Следующий иероглиф</button>
+        </div>
+      </section>
     </section>
 
+
+    <!-- =====================================================
+         БЛОК 5: Понимание текста
+         ===================================================== -->
+    <section id="readingMode" class="mode-section panel hidden">
+      <h2>Понимание текста</h2>
+      <p class="muted">
+        Добавляй китайский текст, слушай его целиком и нажимай на отдельные иероглифы, чтобы услышать звук.
+        Встроенный учебный переводчик пока ищет знакомые слова по нашему словарю.
+      </p>
+
+      <div class="reading-layout">
+        <div class="reading-editor">
+          <h3>Добавить текст</h3>
+          <input id="readingTitleInput" placeholder="Название текста, например: Мой первый диалог">
+          <textarea id="readingTextInput" rows="7" placeholder="Вставь китайский текст здесь..."></textarea>
+          <textarea id="readingManualTranslationInput" rows="4" placeholder="Свой перевод или заметки, если хочешь..."></textarea>
+
+          <div class="button-row">
+            <button onclick="addReadingText()">Добавить текст</button>
+            <button class="secondary" onclick="clearReadingEditor()">Очистить поля</button>
+          </div>
+
+          <div id="readingMessage" class="message"></div>
+
+          <h3>Мои тексты</h3>
+          <div id="readingTextList" class="reading-text-list"></div>
+        </div>
+
+        <div class="reading-viewer">
+          <div class="reading-toolbar">
+            <button onclick="speakCurrentReadingText()">Прослушать весь текст</button>
+            <button class="secondary" onclick="renderReading()">Обновить</button>
+          </div>
+
+          <h3 id="currentReadingTitle">Текст не выбран</h3>
+          <div id="readingTextView" class="reading-text-view"></div>
+
+          <h3>Учебный переводчик</h3>
+          <div id="readingTranslationBox" class="reading-translation-box"></div>
+
+          <h3>Свой перевод / заметки</h3>
+          <div id="readingManualTranslationView" class="reading-manual-translation"></div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- =====================================================
+         БЛОК 4: Словарь
+         ===================================================== -->
     <section id="dictionaryMode" class="mode-section panel hidden">
       <h2>Словарь</h2>
 
@@ -100,31 +208,36 @@
         <button class="secondary" onclick="setDictionaryFilter('learned')">Выучены</button>
       </div>
 
-      <input id="dictionarySearch" oninput="renderDictionary()" placeholder="Поиск: 我, wo, я, verb...">
+      <div class="dictionary-tools">
+        <div class="dictionary-search-box">
+          <label class="meta" for="dictionarySearch">Поиск слова</label>
+          <input id="dictionarySearch" oninput="renderDictionary()" placeholder="Поиск: 我, wo, я, verb...">
+        </div>
+
+        <details class="add-box dictionary-add-box">
+          <summary>Добавить слово</summary>
+          <input id="newChinese" placeholder="Иероглифы, например: 爱">
+          <input id="newPinyin" placeholder="pinyin, например: ài">
+          <input id="newMeaning" placeholder="перевод, например: любовь / любить">
+          <select id="newType">
+            <option value="noun">noun</option>
+            <option value="verb">verb</option>
+            <option value="pronoun">pronoun</option>
+            <option value="adjective">adjective</option>
+            <option value="adverb">adverb</option>
+            <option value="particle">particle</option>
+            <option value="question_word">question_word</option>
+            <option value="number">number</option>
+            <option value="time">time</option>
+            <option value="phrase">phrase</option>
+          </select>
+          <button onclick="addCustomWord()">Добавить слово</button>
+          <div id="addWordMessage" class="message"></div>
+        </details>
+      </div>
 
       <div id="dictionaryWarnings"></div>
       <div id="dictionaryList" class="dictionary-list"></div>
-
-      <details class="add-box">
-        <summary>Добавить слово</summary>
-        <input id="newChinese" placeholder="Иероглифы, например: 爱">
-        <input id="newPinyin" placeholder="pinyin, например: ài">
-        <input id="newMeaning" placeholder="перевод, например: любовь / любить">
-        <select id="newType">
-          <option value="noun">noun</option>
-          <option value="verb">verb</option>
-          <option value="pronoun">pronoun</option>
-          <option value="adjective">adjective</option>
-          <option value="adverb">adverb</option>
-          <option value="particle">particle</option>
-          <option value="question_word">question_word</option>
-          <option value="number">number</option>
-          <option value="time">time</option>
-          <option value="phrase">phrase</option>
-        </select>
-        <button onclick="addCustomWord()">Добавить слово</button>
-        <div id="addWordMessage" class="message"></div>
-      </details>
     </section>
   </main>
 
