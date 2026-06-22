@@ -251,7 +251,86 @@ function getWritingShortcutButton(wordId) {
     </button>
   `;
 }
+let selectedChineseVoice = null;
+let lastSpokenText = "";
+let lastSpokenTime = 0;
 
+function loadChineseVoice() {
+  if (!("speechSynthesis" in window)) {
+    return;
+  }
+
+  const voices = speechSynthesis.getVoices();
+
+  selectedChineseVoice =
+    voices.find(voice => voice.lang.toLowerCase().startsWith("zh-cn")) ||
+    voices.find(voice => voice.lang.toLowerCase().startsWith("zh")) ||
+    voices.find(voice => voice.name.toLowerCase().includes("chinese")) ||
+    null;
+}
+
+if ("speechSynthesis" in window) {
+  loadChineseVoice();
+  speechSynthesis.onvoiceschanged = loadChineseVoice;
+}
+
+function speakChinese(text, isHover = false) {
+  if (!text) {
+    return;
+  }
+
+  if (!("speechSynthesis" in window)) {
+    if (!isHover) {
+      alert("На этом устройстве автоматическая озвучка не поддерживается.");
+    }
+    return;
+  }
+
+  const now = Date.now();
+
+  if (isHover && text === lastSpokenText && now - lastSpokenTime < 1200) {
+    return;
+  }
+
+  lastSpokenText = text;
+  lastSpokenTime = now;
+
+  speechSynthesis.cancel();
+
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = "zh-CN";
+  utterance.rate = 0.75;
+  utterance.pitch = 1;
+
+  if (selectedChineseVoice) {
+    utterance.voice = selectedChineseVoice;
+  }
+
+  speechSynthesis.speak(utterance);
+}
+
+function speakFromElement(element, isHover = false) {
+  const text = element.dataset.speak || element.textContent.trim();
+  speakChinese(text, isHover);
+}
+
+function getSpeakableChinese(text, className = "") {
+  return `
+    <span
+      class="${className} speakable-chinese"
+      data-speak="${escapeHTML(text)}"
+      onclick="speakFromElement(this)"
+      onmouseenter="speakFromElement(this, true)"
+    >
+      ${escapeHTML(text)}
+    </span>
+  `;
+}
+
+function showWordInfoAndSpeak(element, wordId) {
+  showWordInfo(wordId);
+  speakFromElement(element);
+}
 function renderCard(showAnswer = false) {
   const box = document.getElementById("cardBox");
   const word = getCurrentCardWord();
@@ -354,11 +433,11 @@ function renderWriting() {
   writingCharacters = getCharactersFromWord(word);
   writingCharacterIndex = 0;
 
-  wordBox.innerHTML = `
-    ${escapeHTML(word.chinese)}
-    <span class="pinyin">${escapeHTML(word.pinyin)}</span>
-    <div class="meaning">${escapeHTML(word.meaning)}</div>
-  `;
+ wordBox.innerHTML = `
+  ${getSpeakableChinese(word.chinese, "writing-main-chinese")}
+  <span class="pinyin">${escapeHTML(word.pinyin)}</span>
+  <div class="meaning">${escapeHTML(word.meaning)}</div>
+`;
 
   renderWritingCharacterButtons();
   loadCurrentHanziCharacter();
@@ -380,14 +459,16 @@ function renderWritingCharacterButtons() {
     return;
   }
 
-  box.innerHTML = writingCharacters.map((character, index) => `
-    <button
-      class="character-button ${index === writingCharacterIndex ? "active" : ""}"
-      onclick="selectWritingCharacter(${index})"
-    >
-      ${escapeHTML(character)}
-    </button>
-  `).join("");
+box.innerHTML = writingCharacters.map((character, index) => `
+  <button
+    class="character-button ${index === writingCharacterIndex ? "active" : ""}"
+    data-speak="${escapeHTML(character)}"
+    onclick="selectWritingCharacter(${index}); speakFromElement(this)"
+    onmouseenter="speakFromElement(this, true)"
+  >
+    ${escapeHTML(character)}
+  </button>
+`).join("");
 }
 
 function selectWritingCharacter(index) {
@@ -611,8 +692,16 @@ function renderSentence() {
     if (!word) return "";
 
     const status = getProgress(word.id).status;
-    return `<span class="phrase-token ${status}" onclick="showWordInfo('${escapeHTML(word.id)}')">${escapeHTML(word.chinese)}</span>`;
-  }).join("");
+    return `
+  <span
+    class="phrase-token ${status} speakable-chinese"
+    data-speak="${escapeHTML(word.chinese)}"
+    onclick="showWordInfoAndSpeak(this, '${escapeHTML(word.id)}')"
+    onmouseenter="speakFromElement(this, true)"
+  >
+    ${escapeHTML(word.chinese)}
+  </span>
+`;
 
   prompt.textContent = currentPhrase.prompt || `Собери: ${currentPhrase.translation}`;
   message.textContent = "";
@@ -632,10 +721,10 @@ function showWordInfo(wordId) {
 
   document.getElementById("wordInfoBox").innerHTML = `
     <div class="word-info-card">
-      <div class="word-title-row">
-        <div class="chinese-big">${escapeHTML(word.chinese)}</div>
-        ${getWritingShortcutButton(word.id)}
-      </div>
+     <div class="word-title-row">
+  ${getSpeakableChinese(word.chinese, "chinese-big")}
+  ${getWritingShortcutButton(word.id)}
+</div>
       <div class="pinyin">${escapeHTML(word.pinyin)}</div>
       <div class="meaning">${escapeHTML(word.meaning)}</div>
       <p class="meta">type: ${escapeHTML(word.type)} · status: ${statusLabel(item.status)} · mastery: ${item.mastery}/5</p>
@@ -660,7 +749,16 @@ function renderWordBank() {
 
   bank.innerHTML = currentPhrase.bank.map((wordText, index) => {
     const selected = selectedBankIndexes.includes(index);
-    return `<span class="word-chip ${selected ? "selected" : ""}" onclick="addSentenceWord(${index})">${escapeHTML(wordText)}</span>`;
+   return `
+  <span
+    class="word-chip ${selected ? "selected" : ""} speakable-chinese"
+    data-speak="${escapeHTML(wordText)}"
+    onclick="speakFromElement(this); addSentenceWord(${index})"
+    onmouseenter="speakFromElement(this, true)"
+  >
+    ${escapeHTML(wordText)}
+  </span>
+`;
   }).join("");
 }
 
@@ -682,9 +780,16 @@ function renderSentenceBuild() {
     return;
   }
 
-  build.innerHTML = sentenceAnswer.map((word, index) =>
-    `<span class="word-chip" onclick="removeSentenceWord(${index})">${escapeHTML(word)}</span>`
-  ).join("");
+  build.innerHTML = sentenceAnswer.map((word, index) => `
+  <span
+    class="word-chip speakable-chinese"
+    data-speak="${escapeHTML(word)}"
+    onclick="speakFromElement(this); removeSentenceWord(${index})"
+    onmouseenter="speakFromElement(this, true)"
+  >
+    ${escapeHTML(word)}
+  </span>
+`).join("");
 }
 
 function removeSentenceWord(answerIndex) {
@@ -848,9 +953,9 @@ function renderDictionary() {
     return `
       <div class="word-row">
         <div class="word-title-row">
-          <div class="chinese">${escapeHTML(word.chinese)}</div>
-          ${getWritingShortcutButton(word.id)}
-        </div>
+  ${getSpeakableChinese(word.chinese, "chinese")}
+  ${getWritingShortcutButton(word.id)}
+</div>
         <div class="pinyin">${escapeHTML(word.pinyin)}</div>
         <div>${escapeHTML(word.meaning)}</div>
         <p class="meta">id: ${escapeHTML(word.id)}<br>type: ${escapeHTML(word.type)}<br>status: ${statusLabel(item.status)} · mastery: ${item.mastery}/5</p>
