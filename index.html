@@ -59,12 +59,9 @@
 
       <div id="writingMessage" class="message"></div>
 
-      <div class="button-row">
-        <button onclick="animateHanzi()">Показать порядок черт</button>
-        <button class="secondary" onclick="startHanziQuiz()">Попробовать самой</button>
-        <button class="secondary" onclick="previousWritingCharacter()">← Предыдущий</button>
-        <button class="secondary" onclick="nextWritingCharacter()">Следующий →</button>
-        <button onclick="markWritingDone()">Я потренировалась</button>
+      <div class="button-row writing-actions">
+        <button class="secondary" onclick="animateHanzi()">Показать порядок черт</button>
+        <button onclick="checkWritingCharacter()">Проверить написание</button>
       </div>
     </section>
 
@@ -87,7 +84,7 @@
         <p id="phraseSource" class="meta"></p>
 
         <div id="phraseText" class="phrase-text"></div>
-        <div id="wordInfoBox"></div>
+        <div id="wordInfoBox" class="sentence-popup-host" aria-live="polite"></div>
 
         <div id="sentencePrompt" class="sentence-prompt-card"></div>
         <div id="sentenceTranslationBox" class="sentence-translation-box hidden"></div>
@@ -97,7 +94,8 @@
 
         <div class="button-row">
           <button class="secondary" onclick="clearSentence()">Очистить</button>
-          <button onclick="nextPhraseAction()">Следующая фраза</button>
+          <button onclick="checkSentence()">Проверить предложение</button>
+          <button class="secondary" onclick="nextPhraseAction()">Следующее предложение</button>
         </div>
 
         <details class="add-box">
@@ -137,6 +135,7 @@
       <section id="memoryExerciseDraw" class="memory-exercise hidden">
         <p class="muted">Вспомни и напиши иероглиф без контура и без готового символа.</p>
         <div id="drawTaskBox" class="memory-task-box"></div>
+        <div id="drawCharacters" class="character-picker draw-character-picker"></div>
         <div id="memoryHanziTarget" class="memory-hanzi-target"></div>
         <div id="drawMessage" class="message"></div>
         <div class="button-row">
@@ -164,8 +163,10 @@
           <textarea id="readingTextInput" rows="7" placeholder="Вставь китайский текст здесь..."></textarea>
           <textarea id="readingManualTranslationInput" rows="4" placeholder="Свой перевод или заметки, если хочешь..."></textarea>
 
+          <input id="editingReadingId" type="hidden">
+
           <div class="button-row">
-            <button onclick="addReadingText()">Добавить текст</button>
+            <button id="readingSaveButton" onclick="saveReadingText()">Добавить текст</button>
             <button class="secondary" onclick="clearReadingEditor()">Очистить поля</button>
           </div>
 
@@ -178,6 +179,8 @@
         <div class="reading-viewer">
           <div class="reading-toolbar">
             <button onclick="speakCurrentReadingText()">Прослушать весь текст</button>
+            <button class="secondary" onclick="stopSpeaking()">Остановить звук</button>
+            <button class="secondary" onclick="addSelectedChineseToDictionary()">Добавить выделенное слово</button>
             <button class="secondary" onclick="renderReading()">Обновить</button>
           </div>
 
