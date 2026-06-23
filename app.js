@@ -22,6 +22,7 @@ let customWords = loadJSON(CUSTOM_WORDS_KEY, []);
 let customPhrases = loadJSON(CUSTOM_PHRASES_KEY, []);
 let readingTexts = loadJSON(CUSTOM_TEXTS_KEY, []);
 let currentReadingTextId = readingTexts.length ? readingTexts[0].id : null;
+let currentReadingPopupText = "";
 let currentLesson = loadJSON(LESSON_KEY, []);
 let currentCardIndex = 0;
 let currentMode = "cards";
@@ -36,6 +37,7 @@ let currentMatchTask = null;
 let currentRecallTask = null;
 let currentDrawTask = null;
 let memoryHanziWriter = null;
+let lastSentenceCheckWasCorrect = false;
 
 let hanziWriter = null;
 let writingWord = null;
@@ -372,6 +374,12 @@ function showWordInfoAndSpeak(element, wordId) {
 }
 
 
+
+function stopSpeaking() {
+  if ("speechSynthesis" in window) {
+    speechSynthesis.cancel();
+  }
+}
 
 // =====================================================
 // БЛОК 1: УЧИТЬ СЛОВА — живая доска иероглифов
@@ -720,9 +728,7 @@ function renderWritingCharacterButtons() {
   box.innerHTML = writingCharacters.map((character, index) => `
     <button
       class="character-button ${index === writingCharacterIndex ? "active" : ""}"
-      data-speak="${escapeHTML(character)}"
-      onclick="selectWritingCharacter(${index}); speakFromElement(this)"
-      onmouseenter="speakFromElement(this, true)"
+      onclick="selectWritingCharacter(${index})"
     >
       ${escapeHTML(character)}
     </button>
@@ -757,13 +763,13 @@ function loadCurrentHanziCharacter() {
   target.style.width = size + "px";
   target.style.height = size + "px";
 
-  showWritingMessage(`Сейчас тренируем: ${character}`, "");
+  showWritingMessage(`Сейчас тренируем: ${character}. Можно писать сразу или нажать “Проверить написание”.`, "");
 
   hanziWriter = HanziWriter.create("hanziTarget", character, {
     width: size,
     height: size,
     padding: 24,
-    showOutline: false,
+    showOutline: true,
     showCharacter: false,
     strokeAnimationSpeed: 1,
     delayBetweenStrokes: 180,
@@ -771,7 +777,7 @@ function loadCurrentHanziCharacter() {
     radicalColor: "#6f3fd8",
 
     onLoadCharDataSuccess: function() {
-      showWritingMessage(`Иероглиф ${character} загружен. Можно сразу писать.`, "ok");
+      showWritingMessage(`Иероглиф ${character} загружен. Можно писать.`, "ok");
 
       setTimeout(function() {
         startHanziQuiz(true);
@@ -800,6 +806,15 @@ function animateHanzi() {
   hanziWriter.animateCharacter();
 }
 
+function checkWritingCharacter() {
+  if (!hanziWriter) {
+    showWritingMessage("Сначала выбери иероглиф.", "error");
+    return;
+  }
+
+  startHanziQuiz(false);
+}
+
 function startHanziQuiz(isAutoStart = false) {
   if (!hanziWriter) {
     showWritingMessage("Сначала выбери иероглиф.", "error");
@@ -809,24 +824,34 @@ function startHanziQuiz(isAutoStart = false) {
   showWritingMessage(
     isAutoStart
       ? "Пиши сама. Если ошибёшься, приложение подскажет."
-      : "Пиши иероглиф по чертам. Если ошибёшься, приложение подскажет.",
+      : "Проверка включена. Напиши иероглиф полностью.",
     ""
   );
 
   hanziWriter.quiz({
-    showHintAfterMisses: 2,
-    leniency: 1,
+    showHintAfterMisses: 3,
+    leniency: 1.35,
 
     onCorrectStroke: function() {
       showWritingMessage("Правильно. Продолжай.", "ok");
     },
 
     onMistake: function(strokeData) {
-      showWritingMessage(`Ошибка в этой черте. Ошибок: ${strokeData.totalMistakes}`, "error");
+      showWritingMessage(`Почти. Попробуй эту черту ещё раз. Ошибок: ${strokeData.totalMistakes}`, "error");
     },
 
     onComplete: function(summaryData) {
-      showWritingMessage(`Иероглиф завершён. Всего ошибок: ${summaryData.totalMistakes}`, "ok");
+      const word = writingWord || getCurrentCardWord();
+
+      if (word) {
+        const item = getProgress(word.id);
+        item.writingDone = true;
+        item.mastery = Math.min(5, item.mastery + 1);
+        updateStatus(word.id);
+        renderStats();
+      }
+
+      showWritingMessage(`Готово. Иероглиф написан правильно. Ошибок: ${summaryData.totalMistakes}`, "ok reward");
     }
   });
 }
@@ -1150,20 +1175,20 @@ function checkMatchPairIfReady() {
 // ---------- B) Вспомнить иероглиф / pinyin ----------
 
 function nextRecallExercise() {
-  const words = getMemoryWords();
+  const phrases = getAvailablePhrases();
 
-  if (!words.length) {
+  if (!phrases.length) {
     currentRecallTask = null;
     renderRecallExercise();
     return;
   }
 
-  const word = chooseRandom(words);
-  const taskTypes = ["meaningToChinese", "chineseToPinyin"];
+  const phrase = chooseRandom(phrases);
+  const taskTypes = ["translationToChinese", "translationToPinyin"];
   const taskType = chooseRandom(taskTypes);
 
   currentRecallTask = {
-    word,
+    phrase,
     taskType
   };
 
@@ -1182,26 +1207,27 @@ function renderRecallExercise() {
   message.className = "message";
 
   if (!currentRecallTask) {
-    taskBox.innerHTML = `<p class="muted">Нет слов для упражнения.</p>`;
+    taskBox.innerHTML = `<p class="muted">Нет фраз или предложений для упражнения.</p>`;
     return;
   }
 
-  const { word, taskType } = currentRecallTask;
+  const { phrase, taskType } = currentRecallTask;
+  const translation = phrase.translation || phrase.prompt || "Перевод не указан.";
 
-  if (taskType === "meaningToChinese") {
+  if (taskType === "translationToChinese") {
     taskBox.innerHTML = `
-      <div class="memory-question">${escapeHTML(word.meaning)}</div>
-      <p class="muted">Введи китайский иероглиф или слово вручную. Звук здесь отключён.</p>
+      <div class="recall-russian">${escapeHTML(translation)}</div>
+      <p class="muted">Введи китайские иероглифы вручную. Звук здесь отключён.</p>
     `;
-    input.placeholder = "Например: 我";
+    input.placeholder = "Например: 我喜欢茶";
   }
 
-  if (taskType === "chineseToPinyin") {
+  if (taskType === "translationToPinyin") {
     taskBox.innerHTML = `
-      <div class="memory-question memory-question-chinese-no-sound">${escapeHTML(word.chinese)}</div>
-      <p class="muted">Введи pinyin. Звук здесь отключён, чтобы ты вспоминала сама.</p>
+      <div class="recall-russian">${escapeHTML(translation)}</div>
+      <p class="muted">Введи pinyin. Тоны можно не писать.</p>
     `;
-    input.placeholder = "Например: ni hao";
+    input.placeholder = "Например: wo xihuan cha";
   }
 
   input.focus();
@@ -1214,41 +1240,91 @@ function checkRecallAnswer() {
   if (!currentRecallTask || !input || !message) return;
 
   const answer = input.value.trim();
-  const { word, taskType } = currentRecallTask;
+  const { phrase, taskType } = currentRecallTask;
+
+  const correctChinese = getPhraseChineseText(phrase).replace(/[。？！?!.，,、\s]/g, "");
+  const correctPinyin = getPhrasePinyinText(phrase);
 
   let correct = false;
   let correctAnswer = "";
 
-  if (taskType === "meaningToChinese") {
-    correctAnswer = word.chinese;
-    correct = answer === word.chinese;
+  if (taskType === "translationToChinese") {
+    correctAnswer = correctChinese;
+    correct = answer.replace(/[。？！?!.，,、\s]/g, "") === correctChinese;
   }
 
-  if (taskType === "chineseToPinyin") {
-    correctAnswer = word.pinyin;
-    correct = normalizePinyinAnswer(answer) === normalizePinyinAnswer(word.pinyin);
+  if (taskType === "translationToPinyin") {
+    correctAnswer = correctPinyin;
+    correct = normalizePinyinAnswer(answer) === normalizePinyinAnswer(correctPinyin);
   }
 
   if (correct) {
-    markMemorySuccess(word.id);
-    message.textContent = "Правильно.";
-    message.className = "message ok";
-    setTimeout(nextRecallExercise, 650);
+    markPhraseRecallSuccess(phrase);
+    message.innerHTML = `
+      <div class="reward-box">
+        <div class="reward-stars">✨ ✓ ✨</div>
+        <strong>Правильно.</strong>
+        <p>${escapeHTML(correctAnswer)}</p>
+      </div>
+    `;
+    message.className = "message ok reward";
+    setTimeout(nextRecallExercise, 850);
     return;
   }
 
-  markMemoryMistake(word.id);
-  message.textContent = `Пока неправильно. Правильный ответ: ${correctAnswer}`;
+  markPhraseRecallMistake(phrase);
+  message.innerHTML = `
+    <div class="mistake-box">
+      <strong>Пока неправильно.</strong>
+      <p>Правильный ответ: ${escapeHTML(correctAnswer)}</p>
+    </div>
+  `;
   message.className = "message error";
+}
+
+function getPhrasePinyinText(phrase) {
+  if (!phrase || !phrase.tokens) return "";
+
+  return phrase.tokens.map(token => {
+    if (!token.wordId) return "";
+
+    const word = getWordById(token.wordId);
+    return word ? word.pinyin : "";
+  }).filter(Boolean).join(" ");
+}
+
+function markPhraseRecallSuccess(phrase) {
+  if (!phrase || !phrase.tokens) return;
+
+  phrase.tokens.forEach(token => {
+    if (!token.wordId) return;
+    markMemorySuccess(token.wordId);
+  });
+}
+
+function markPhraseRecallMistake(phrase) {
+  if (!phrase || !phrase.tokens) return;
+
+  phrase.tokens.forEach(token => {
+    if (!token.wordId) return;
+    markMemoryMistake(token.wordId);
+  });
 }
 
 function normalizePinyinAnswer(value) {
   return String(value || "")
     .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .replaceAll("ü", "u")
+    .replaceAll("v", "u")
+    .replace(/[0-9]/g, "")
+    .replace(/[。？！?!.，,、]/g, "")
     .replace(/\s+/g, "")
     .trim();
 }
+
+// ---------- C) Нарисовать без подсказок ----------
 
 // ---------- C) Нарисовать без подсказок ----------
 
@@ -1263,11 +1339,12 @@ function nextDrawExercise() {
 
   const word = chooseRandom(words);
   const characters = getCharactersFromWord(word);
-  const character = chooseRandom(characters);
 
   currentDrawTask = {
     word,
-    character
+    characters,
+    characterIndex: 0,
+    character: characters[0]
   };
 
   renderDrawExercise();
@@ -1275,6 +1352,7 @@ function nextDrawExercise() {
 
 function renderDrawExercise() {
   const taskBox = document.getElementById("drawTaskBox");
+  const picker = document.getElementById("drawCharacters");
   const target = document.getElementById("memoryHanziTarget");
   const message = document.getElementById("drawMessage");
 
@@ -1287,19 +1365,47 @@ function renderDrawExercise() {
 
   if (!currentDrawTask) {
     taskBox.innerHTML = `<p class="muted">Нет иероглифов для письма.</p>`;
+    if (picker) picker.innerHTML = "";
     target.innerHTML = "";
     return;
   }
 
+  const total = currentDrawTask.characters.length;
+  const number = currentDrawTask.characterIndex + 1;
+
   taskBox.innerHTML = `
     <div class="memory-question">${escapeHTML(currentDrawTask.word.meaning)}</div>
     <p class="muted">
-      Pinyin: ${escapeHTML(currentDrawTask.word.pinyin)}.
-      Вспомни нужный иероглиф и напиши его без контура.
+      Pinyin слова: ${escapeHTML(currentDrawTask.word.pinyin)}.
+      Напиши ${number}-й иероглиф из ${total}. Сам иероглиф скрыт.
     </p>
   `;
 
+  renderDrawCharacterButtons();
   loadMemoryHanziWriter();
+}
+
+function renderDrawCharacterButtons() {
+  const picker = document.getElementById("drawCharacters");
+  if (!picker || !currentDrawTask) return;
+
+  picker.innerHTML = currentDrawTask.characters.map((character, index) => `
+    <button
+      class="character-button ${index === currentDrawTask.characterIndex ? "active" : ""}"
+      onclick="selectDrawCharacter(${index})"
+    >
+      ${index + 1}
+    </button>
+  `).join("");
+}
+
+function selectDrawCharacter(index) {
+  if (!currentDrawTask) return;
+
+  currentDrawTask.characterIndex = index;
+  currentDrawTask.character = currentDrawTask.characters[index];
+
+  renderDrawExercise();
 }
 
 function loadMemoryHanziWriter() {
@@ -1360,7 +1466,7 @@ function startMemoryDrawQuiz() {
 
   memoryHanziWriter.quiz({
     showHintAfterMisses: 3,
-    leniency: 1,
+    leniency: 1.35,
 
     onCorrectStroke: function() {
       message.textContent = "Правильно. Продолжай.";
@@ -1368,14 +1474,20 @@ function startMemoryDrawQuiz() {
     },
 
     onMistake: function(strokeData) {
-      message.textContent = `Ошибка в этой черте. Ошибок: ${strokeData.totalMistakes}`;
+      message.textContent = `Почти. Попробуй эту черту ещё раз. Ошибок: ${strokeData.totalMistakes}`;
       message.className = "message error";
     },
 
     onComplete: function(summaryData) {
       markMemorySuccess(currentDrawTask.word.id);
-      message.textContent = `Готово. Иероглиф был: ${currentDrawTask.character}. Ошибок: ${summaryData.totalMistakes}`;
-      message.className = "message ok";
+      message.innerHTML = `
+        <div class="reward-box">
+          <div class="reward-stars">✨ ✓ ✨</div>
+          <strong>Иероглиф написан правильно.</strong>
+          <p>Это был ${escapeHTML(currentDrawTask.character)}. Ошибок: ${summaryData.totalMistakes}</p>
+        </div>
+      `;
+      message.className = "message ok reward";
     }
   });
 }
@@ -1432,11 +1544,6 @@ function nextPhrase() {
 }
 
 function nextPhraseAction() {
-  if (currentPhrase && sentenceAnswer.length > 0) {
-    const ok = checkSentence();
-    if (!ok) return;
-  }
-
   nextPhrase();
 }
 
@@ -1458,32 +1565,52 @@ function renderSentence() {
     return;
   }
 
-  source.textContent = currentPhrase.source === "custom" ? "Личная фраза" : "Готовая фраза из phrases.js";
+  lastSentenceCheckWasCorrect = false;
+  source.textContent = currentPhrase.source === "custom" ? "Личная фраза" : "Учебное предложение";
 
   phraseText.innerHTML = `
-    <div class="sentence-hidden-source">
-      Правильная китайская фраза скрыта. Сначала попробуй собрать её сама.
-      <button class="secondary small-button" onclick="revealCorrectSentence()">Показать фразу</button>
+    <div class="sentence-hidden-source compact">
+      Китайская фраза скрыта.
+      <button class="secondary small-button" onclick="revealCorrectSentence()">Показать китайскую фразу</button>
     </div>
   `;
 
+  const sentenceChineseText = getPhraseChineseText(currentPhrase);
+
   prompt.innerHTML = `
-    <div class="memory-question">Построй предложение из слов</div>
-    <p class="muted">
-      Перевод скрыт. Сначала попробуй вспомнить смысл и порядок слов.
-    </p>
-    <button class="secondary small-button" onclick="revealSentenceTranslation()">Показать перевод</button>
+    <div class="sentence-mini-title">Собери китайское предложение</div>
+
+    <div class="sentence-task-row">
+      <div class="sentence-task-translation">
+        ${escapeHTML(currentPhrase.translation || currentPhrase.prompt || "Перевод пока не добавлен.")}
+      </div>
+
+      <button
+        class="secondary sentence-audio-button"
+        type="button"
+        onclick="speakChinese('${escapeForInline(sentenceChineseText)}')"
+        title="Прослушать всё предложение"
+      >
+        🔊 Всё предложение
+      </button>
+    </div>
+
+    ${currentPhrase.explanation ? `
+      <div class="grammar-hint">
+        <strong>Грамматика:</strong> ${escapeHTML(currentPhrase.explanation)}
+      </div>
+    ` : ""}
   `;
 
   if (translationBox) {
     translationBox.classList.add("hidden");
     translationBox.innerHTML = `
-      <strong>Перевод:</strong>
+      <strong>Правильный перевод:</strong>
       ${escapeHTML(currentPhrase.translation || "Перевод пока не добавлен.")}
     `;
   }
 
-  message.textContent = "";
+  message.innerHTML = "";
   message.className = "message";
 
   if (!infoBox.innerHTML) infoBox.innerHTML = "";
@@ -1504,7 +1631,7 @@ function revealCorrectSentence() {
   if (!box || !currentPhrase) return;
 
   box.innerHTML = currentPhrase.tokens.map(token => {
-    if (token.text) return `<span>${escapeHTML(token.text)}</span>`;
+    if (token.text) return `<span class="phrase-punctuation">${escapeHTML(token.text)}</span>`;
 
     const word = getWordById(token.wordId);
     if (!word) return "";
@@ -1514,7 +1641,9 @@ function revealCorrectSentence() {
       <span
         class="phrase-token ${status}"
         data-speak="${escapeHTML(word.chinese)}"
-        onclick="showWordInfo('${escapeHTML(word.id)}')"
+        onclick="handleSentenceTokenClick(event, this, '${escapeHTML(word.id)}')"
+        onmouseenter="showSentenceWordPopup(this, '${escapeHTML(word.id)}')"
+        title="Нажми, чтобы озвучить и открыть карточку"
       >
         ${escapeHTML(word.chinese)}
       </span>
@@ -1522,30 +1651,85 @@ function revealCorrectSentence() {
   }).join("");
 }
 
+function handleSentenceTokenClick(event, element, wordId) {
+  if (event) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
+
+  const word = getWordById(wordId);
+  if (!word) return;
+
+  showSentenceWordPopup(element, wordId);
+  speakChinese(word.chinese);
+}
+
 function showWordInfo(wordId) {
+  showSentenceWordPopup(null, wordId);
+}
+
+function showSentenceWordPopup(anchorElement, wordId) {
   const word = getWordById(wordId);
   if (!word) return;
 
   const item = getProgress(wordId);
+  let popup = document.getElementById("sentenceWordPopup");
 
-  document.getElementById("wordInfoBox").innerHTML = `
-    <div class="word-info-card">
-      <div class="word-title-row">
-        ${getSpeakableChinese(word.chinese, "chinese-big")}
-        ${getWritingShortcutButton(word.id)}
-      </div>
-      <div class="pinyin">${escapeHTML(word.pinyin)}</div>
-      <div class="meaning">${escapeHTML(word.meaning)}</div>
-      <p class="meta">type: ${escapeHTML(word.type)} · status: ${statusLabel(item.status)} · mastery: ${item.mastery}/5</p>
-      <label class="meta">Переместить слово в блок:</label>
-      <select onchange="moveWordToStatusFromSelect('${escapeHTML(word.id)}', this.value)">
-        <option value="new" ${item.status === "new" ? "selected" : ""}>новые</option>
-        <option value="learning" ${item.status === "learning" ? "selected" : ""}>изучение</option>
-        <option value="review" ${item.status === "review" ? "selected" : ""}>повторение</option>
-        <option value="learned" ${item.status === "learned" ? "selected" : ""}>выученные</option>
-      </select>
+  if (!popup) {
+    popup = document.createElement("div");
+    popup.id = "sentenceWordPopup";
+    popup.className = "sentence-word-popup";
+    document.body.appendChild(popup);
+  }
+
+  popup.innerHTML = `
+    <button
+      class="sentence-popup-close"
+      type="button"
+      onclick="hideSentenceWordPopup()"
+      aria-label="Закрыть"
+    >
+      ×
+    </button>
+
+    <div class="popup-chinese">${escapeHTML(word.chinese)}</div>
+    <div class="popup-pinyin">${escapeHTML(word.pinyin)}</div>
+    <div class="popup-meaning">${escapeHTML(word.meaning)}</div>
+    <div class="popup-meta">
+      ${statusLabel(item.status)} · mastery ${item.mastery}/5
+    </div>
+
+    <div class="sentence-popup-actions">
+      <button
+        type="button"
+        class="secondary small-button"
+        onclick="speakChinese('${escapeForInline(word.chinese)}')"
+      >
+        🔊
+      </button>
+
+      <button
+        type="button"
+        onclick="openWritingFromSentencePopup('${escapeHTML(word.id)}')"
+      >
+        ✎ Писать
+      </button>
     </div>
   `;
+
+  popup.classList.add("open");
+}
+
+function hideSentenceWordPopup() {
+  const popup = document.getElementById("sentenceWordPopup");
+  if (!popup) return;
+
+  popup.classList.remove("open");
+}
+
+function openWritingFromSentencePopup(wordId) {
+  hideSentenceWordPopup();
+  openWritingForWord(wordId);
 }
 
 function renderWordBank() {
@@ -1609,12 +1793,13 @@ function removeSentenceWord(answerIndex) {
 function clearSentence() {
   selectedBankIndexes = [];
   sentenceAnswer = [];
+  lastSentenceCheckWasCorrect = false;
 
   renderSentenceBuild();
   renderWordBank();
 
   const message = document.getElementById("sentenceMessage");
-  message.textContent = "";
+  message.innerHTML = "";
   message.className = "message";
 }
 
@@ -1635,10 +1820,17 @@ function checkSentence() {
     });
 
     renderStats();
-    revealSentenceTranslation();
     revealCorrectSentence();
-    message.textContent = "Правильно. Отлично: фраза собрана. Переходим к следующей.";
-    message.className = "message ok";
+    lastSentenceCheckWasCorrect = true;
+
+    message.innerHTML = `
+      <div class="reward-box">
+        <div class="reward-stars">✨ ✓ ✨</div>
+        <strong>Предложение построено правильно.</strong>
+        <p>Отлично. Слова стали сильнее в памяти.</p>
+      </div>
+    `;
+    message.className = "message ok reward";
     return true;
   }
 
@@ -1650,8 +1842,14 @@ function checkSentence() {
 
   saveProgress();
   renderStats();
+  lastSentenceCheckWasCorrect = false;
 
-  message.textContent = "Порядок неправильный. Исправь фразу и нажми “Следующая фраза” ещё раз.";
+  message.innerHTML = `
+    <div class="mistake-box">
+      <strong>Порядок пока неправильный.</strong>
+      <p>Попробуй переставить слова и нажми “Проверить предложение”.</p>
+    </div>
+  `;
   message.className = "message error";
   return false;
 }
@@ -1832,14 +2030,18 @@ function getCurrentReadingText() {
 }
 
 function clearReadingEditor() {
+  const editingInput = document.getElementById("editingReadingId");
   const titleInput = document.getElementById("readingTitleInput");
   const textInput = document.getElementById("readingTextInput");
   const translationInput = document.getElementById("readingManualTranslationInput");
   const message = document.getElementById("readingMessage");
+  const saveButton = document.getElementById("readingSaveButton");
 
+  if (editingInput) editingInput.value = "";
   if (titleInput) titleInput.value = "";
   if (textInput) textInput.value = "";
   if (translationInput) translationInput.value = "";
+  if (saveButton) saveButton.textContent = "Добавить текст";
 
   if (message) {
     message.textContent = "";
@@ -1847,12 +2049,14 @@ function clearReadingEditor() {
   }
 }
 
-function addReadingText() {
+function saveReadingText() {
+  const editingInput = document.getElementById("editingReadingId");
   const titleInput = document.getElementById("readingTitleInput");
   const textInput = document.getElementById("readingTextInput");
   const translationInput = document.getElementById("readingManualTranslationInput");
   const message = document.getElementById("readingMessage");
 
+  const editingId = editingInput ? editingInput.value.trim() : "";
   const title = titleInput ? titleInput.value.trim() : "";
   const text = textInput ? textInput.value.trim() : "";
   const manualTranslation = translationInput ? translationInput.value.trim() : "";
@@ -1860,6 +2064,30 @@ function addReadingText() {
   if (!text) {
     message.textContent = "Сначала вставь китайский текст.";
     message.className = "message error";
+    return;
+  }
+
+  if (editingId) {
+    const item = readingTexts.find(textItem => textItem.id === editingId);
+
+    if (!item) {
+      message.textContent = "Не удалось найти текст для редактирования.";
+      message.className = "message error";
+      return;
+    }
+
+    item.title = title || makeReadingTitle(text);
+    item.text = text;
+    item.manualTranslation = manualTranslation;
+    item.updatedAt = new Date().toISOString();
+
+    currentReadingTextId = item.id;
+    saveJSON(CUSTOM_TEXTS_KEY, readingTexts);
+
+    clearReadingEditor();
+    message.textContent = "Текст сохранён.";
+    message.className = "message ok";
+    renderReading();
     return;
   }
 
@@ -1878,8 +2106,40 @@ function addReadingText() {
   clearReadingEditor();
   message.textContent = "Текст добавлен.";
   message.className = "message ok";
-
   renderReading();
+}
+
+function addReadingText() {
+  saveReadingText();
+}
+
+function editReadingText(textId) {
+  const item = readingTexts.find(textItem => textItem.id === textId);
+  if (!item) return;
+
+  const editingInput = document.getElementById("editingReadingId");
+  const titleInput = document.getElementById("readingTitleInput");
+  const textInput = document.getElementById("readingTextInput");
+  const translationInput = document.getElementById("readingManualTranslationInput");
+  const saveButton = document.getElementById("readingSaveButton");
+  const message = document.getElementById("readingMessage");
+
+  if (editingInput) editingInput.value = item.id;
+  if (titleInput) titleInput.value = item.title || "";
+  if (textInput) textInput.value = item.text || "";
+  if (translationInput) translationInput.value = item.manualTranslation || "";
+  if (saveButton) saveButton.textContent = "Сохранить изменения";
+
+  if (message) {
+    message.textContent = "Редактирование текста включено.";
+    message.className = "message ok";
+  }
+
+  currentReadingTextId = item.id;
+  renderReading();
+
+  const editor = document.querySelector(".reading-editor");
+  if (editor) editor.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function makeReadingTitle(text) {
@@ -1889,6 +2149,7 @@ function makeReadingTitle(text) {
 
 function selectReadingText(textId) {
   currentReadingTextId = textId;
+  hideReadingTextPopup();
   renderReading();
 }
 
@@ -1903,6 +2164,8 @@ function deleteReadingText(textId) {
   }
 
   saveJSON(CUSTOM_TEXTS_KEY, readingTexts);
+  clearReadingEditor();
+  hideReadingTextPopup();
   renderReading();
 }
 
@@ -1940,7 +2203,8 @@ function renderReading() {
       <button type="button" onclick="selectReadingText('${escapeHTML(item.id)}')">
         ${escapeHTML(item.title)}
       </button>
-      <button class="small-danger" type="button" onclick="deleteReadingText('${escapeHTML(item.id)}')">×</button>
+      <button class="small-edit" type="button" onclick="editReadingText('${escapeHTML(item.id)}')" title="Редактировать">✎</button>
+      <button class="small-danger" type="button" onclick="deleteReadingText('${escapeHTML(item.id)}')" title="Удалить">×</button>
     </div>
   `).join("");
 
@@ -1955,58 +2219,206 @@ function renderReading() {
 }
 
 function renderInteractiveReadingText(text) {
-  return Array.from(text).map(character => {
-    if (character === "\n") return "<br>";
+  const tokens = tokenizeReadingText(text);
 
-    if (isChineseCharacter(character)) {
-      const word = getWordByChinese(character);
+  return tokens.map(token => {
+    if (token.text === "\n") return "<br>";
+
+    if (token.type === "known") {
+      const word = token.word;
 
       return `
         <span
-          class="reading-char ${word ? "known" : ""}"
-          data-speak="${escapeHTML(character)}"
-          onclick="speakFromElement(this); showReadingCharacterInfo('${escapeHTML(character)}')"
-          onmouseenter="speakFromElement(this, true)"
-          title="${word ? escapeHTML(word.pinyin + " — " + word.meaning) : "Нажми, чтобы озвучить"}"
+          class="reading-word known"
+          data-speak="${escapeHTML(word.chinese)}"
+          onclick="handleReadingTokenClick(event, this, '${escapeHTML(word.chinese)}')"
+          title="${escapeHTML(word.pinyin + " — " + word.meaning)}"
         >
-          ${escapeHTML(character)}
+          ${escapeHTML(word.chinese)}
         </span>
       `;
     }
 
-    return escapeHTML(character);
+    if (token.type === "unknownChinese") {
+      return `
+        <span
+          class="reading-word unknown"
+          data-speak="${escapeHTML(token.text)}"
+          onclick="handleReadingTokenClick(event, this, '${escapeHTML(token.text)}')"
+          title="Нажми, чтобы добавить в словарь"
+        >
+          ${escapeHTML(token.text)}
+        </span>
+      `;
+    }
+
+    return escapeHTML(token.text);
   }).join("");
 }
 
-function showReadingCharacterInfo(character) {
-  const box = document.getElementById("readingTranslationBox");
-  const word = getWordByChinese(character);
+function tokenizeReadingText(text) {
+  const words = getAllWords()
+    .filter(word => word.chinese && word.chinese.length > 0)
+    .sort((a, b) => b.chinese.length - a.chinese.length);
 
-  if (!box) return;
+  const tokens = [];
+  let index = 0;
 
-  if (!word) {
-    box.innerHTML = `
-      <div class="reading-character-card">
-        <div class="popup-chinese">${escapeHTML(character)}</div>
-        <p class="muted">Этого отдельного иероглифа пока нет в словаре.</p>
+  while (index < text.length) {
+    const current = text[index];
+
+    if (!isChineseCharacter(current)) {
+      tokens.push({ type: "plain", text: current });
+      index += 1;
+      continue;
+    }
+
+    const match = words.find(word => text.startsWith(word.chinese, index));
+
+    if (match) {
+      tokens.push({ type: "known", text: match.chinese, word: match });
+      index += match.chinese.length;
+      continue;
+    }
+
+    let unknown = current;
+    let nextIndex = index + 1;
+
+    while (
+      nextIndex < text.length &&
+      isChineseCharacter(text[nextIndex]) &&
+      !words.some(word => text.startsWith(word.chinese, nextIndex))
+    ) {
+      unknown += text[nextIndex];
+      nextIndex += 1;
+    }
+
+    Array.from(unknown).forEach(character => {
+      tokens.push({ type: "unknownChinese", text: character });
+    });
+
+    index = nextIndex;
+  }
+
+  return tokens;
+}
+
+function handleReadingTokenClick(event, element, chineseText) {
+  if (event) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
+
+  showReadingTextPopup(chineseText);
+  speakChinese(chineseText);
+}
+
+function showReadingTextPopup(chineseText) {
+  const word = getWordByChinese(chineseText);
+  currentReadingPopupText = chineseText;
+
+  let popup = document.getElementById("readingTextPopup");
+
+  if (!popup) {
+    popup = document.createElement("div");
+    popup.id = "readingTextPopup";
+    popup.className = "reading-text-popup";
+    document.body.appendChild(popup);
+  }
+
+  if (word) {
+    const item = getProgress(word.id);
+
+    popup.innerHTML = `
+      <button class="sentence-popup-close" type="button" onclick="hideReadingTextPopup()" aria-label="Закрыть">×</button>
+
+      <div class="popup-chinese">${escapeHTML(word.chinese)}</div>
+      <div class="popup-pinyin">${escapeHTML(word.pinyin)}</div>
+      <div class="popup-meaning">${escapeHTML(word.meaning)}</div>
+      <div class="popup-meta">
+        ${statusLabel(item.status)} · mastery ${item.mastery}/5
       </div>
-      ${renderReadingStudyTranslation(getCurrentReadingText()?.text || "")}
+
+      <div class="sentence-popup-actions">
+        <button class="secondary small-button" type="button" onclick="speakChinese('${escapeForInline(word.chinese)}')">🔊</button>
+        <button type="button" onclick="openWritingFromReadingPopup('${escapeHTML(word.id)}')">✎ Писать</button>
+      </div>
     `;
+  } else {
+    popup.innerHTML = `
+      <button class="sentence-popup-close" type="button" onclick="hideReadingTextPopup()" aria-label="Закрыть">×</button>
+
+      <div class="popup-chinese">${escapeHTML(chineseText)}</div>
+      <p class="muted">
+        Этого слова пока нет в словаре. Можно добавить один иероглиф или выделить в тексте несколько иероглифов и нажать “Добавить выделенное слово”.
+      </p>
+
+      <div class="sentence-popup-actions">
+        <button class="secondary small-button" type="button" onclick="speakChinese('${escapeForInline(chineseText)}')">🔊</button>
+        <button type="button" onclick="prepareAddWordFromText('${escapeHTML(chineseText)}')">+ В словарь</button>
+      </div>
+    `;
+  }
+
+  popup.classList.add("open");
+}
+
+function hideReadingTextPopup() {
+  const popup = document.getElementById("readingTextPopup");
+  if (!popup) return;
+
+  popup.classList.remove("open");
+}
+
+function openWritingFromReadingPopup(wordId) {
+  hideReadingTextPopup();
+  openWritingForWord(wordId);
+}
+
+function addSelectedChineseToDictionary() {
+  const selection = window.getSelection ? window.getSelection().toString() : "";
+  const chineseOnly = Array.from(selection).filter(char => isChineseCharacter(char)).join("");
+
+  if (!chineseOnly) {
+    alert("Сначала выдели китайское слово в тексте мышкой или пальцем.");
     return;
   }
 
-  box.innerHTML = `
-    <div class="reading-character-card">
-      <div class="word-title-row">
-        ${getSpeakableChinese(word.chinese, "chinese-big")}
-        ${getWritingShortcutButton(word.id)}
-      </div>
-      <div class="pinyin">${escapeHTML(word.pinyin)}</div>
-      <div class="meaning">${escapeHTML(word.meaning)}</div>
-      <p class="meta">type: ${escapeHTML(word.type)} · status: ${statusLabel(getProgress(word.id).status)}</p>
-    </div>
-    ${renderReadingStudyTranslation(getCurrentReadingText()?.text || "")}
-  `;
+  prepareAddWordFromText(chineseOnly);
+}
+
+function prepareAddWordFromText(chineseText) {
+  const cleanText = Array.from(String(chineseText || ""))
+    .filter(char => isChineseCharacter(char))
+    .join("");
+
+  if (!cleanText) {
+    alert("Не удалось распознать китайские иероглифы.");
+    return;
+  }
+
+  hideReadingTextPopup();
+  showMode("dictionary");
+
+  const details = document.querySelector(".dictionary-add-box");
+  if (details) details.open = true;
+
+  const chineseInput = document.getElementById("newChinese");
+  const pinyinInput = document.getElementById("newPinyin");
+
+  if (chineseInput) {
+    chineseInput.value = cleanText;
+    chineseInput.focus();
+  }
+
+  if (pinyinInput) {
+    pinyinInput.placeholder = "Добавь pinyin для: " + cleanText;
+  }
+
+  setTimeout(function() {
+    const addBox = document.querySelector(".dictionary-add-box");
+    if (addBox) addBox.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, 100);
 }
 
 function renderReadingStudyTranslation(text) {
@@ -2051,6 +2463,9 @@ function findKnownWordsInText(text) {
 
   return result.slice(0, 80);
 }
+
+// =====================================================
+// ФИНАЛ: сброс, общий рендер, запуск приложения
 
 // =====================================================
 // ФИНАЛ: сброс, общий рендер, запуск приложения
