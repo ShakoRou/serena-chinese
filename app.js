@@ -38,12 +38,14 @@ let currentRecallTask = null;
 let currentDrawTask = null;
 let memoryHanziWriter = null;
 let lastSentenceCheckWasCorrect = false;
+let sentenceHistory = [];
 
 let hanziWriter = null;
 let writingWord = null;
 let writingCharacters = [];
 let writingCharacterIndex = 0;
-let selectedWritingWordId = null; 
+let selectedWritingWordId = null;
+let writingCharacterHistory = []; 
 
 let boardSentence = [];
 let boardClickTimer = null;
@@ -769,7 +771,7 @@ function loadCurrentHanziCharacter() {
     width: size,
     height: size,
     padding: 24,
-    showOutline: true,
+    showOutline: false,
     showCharacter: false,
     strokeAnimationSpeed: 1,
     delayBetweenStrokes: 180,
@@ -842,6 +844,7 @@ function startHanziQuiz(isAutoStart = false) {
 
     onComplete: function(summaryData) {
       const word = writingWord || getCurrentCardWord();
+      const currentCharacter = writingCharacters[writingCharacterIndex];
 
       if (word) {
         const item = getProgress(word.id);
@@ -851,9 +854,114 @@ function startHanziQuiz(isAutoStart = false) {
         renderStats();
       }
 
-      showWritingMessage(`Готово. Иероглиф написан правильно. Ошибок: ${summaryData.totalMistakes}`, "ok reward");
+      const hasNextCharacterInSameWord =
+        writingCharacters.length > 1 &&
+        writingCharacterIndex < writingCharacters.length - 1;
+
+      if (hasNextCharacterInSameWord) {
+        const nextCharacter = writingCharacters[writingCharacterIndex + 1];
+
+        showWritingMessage(
+          `Готово: ${currentCharacter}. Сейчас переходим к следующему иероглифу этого же слова: ${nextCharacter}`,
+          "ok reward"
+        );
+
+        setTimeout(function() {
+          selectWritingCharacter(writingCharacterIndex + 1);
+        }, 900);
+
+        return;
+      }
+
+      showWritingMessage(
+        `Готово. Иероглиф написан правильно. Ошибок: ${summaryData.totalMistakes}`,
+        "ok reward"
+      );
     }
   });
+}
+
+function getAllWritingCharacterTargets() {
+  const targets = [];
+
+  getAllWords().forEach(word => {
+    const characters = getCharactersFromWord(word);
+
+    characters.forEach((character, index) => {
+      targets.push({
+        wordId: word.id,
+        characterIndex: index,
+        character
+      });
+    });
+  });
+
+  return targets;
+}
+
+function getCurrentWritingCharacterTarget() {
+  if (!writingWord || !writingCharacters.length) return null;
+
+  return {
+    wordId: writingWord.id,
+    characterIndex: writingCharacterIndex,
+    character: writingCharacters[writingCharacterIndex]
+  };
+}
+
+function isSameWritingTarget(a, b) {
+  if (!a || !b) return false;
+
+  return a.wordId === b.wordId && a.characterIndex === b.characterIndex;
+}
+
+function openWritingCharacterTarget(target, rememberCurrent = true) {
+  if (!target) return;
+
+  const currentTarget = getCurrentWritingCharacterTarget();
+
+  if (rememberCurrent && currentTarget) {
+    writingCharacterHistory.push(currentTarget);
+
+    if (writingCharacterHistory.length > 50) {
+      writingCharacterHistory.shift();
+    }
+  }
+
+  selectedWritingWordId = target.wordId;
+  renderWriting();
+
+  if (writingCharacters[target.characterIndex]) {
+    selectWritingCharacter(target.characterIndex);
+  }
+
+  showWritingMessage(`Выбран иероглиф: ${target.character}`, "ok");
+}
+
+function nextRandomWritingCharacter() {
+  const targets = getAllWritingCharacterTargets();
+
+  if (!targets.length) {
+    showWritingMessage("В словаре пока нет китайских иероглифов.", "error");
+    return;
+  }
+
+  const currentTarget = getCurrentWritingCharacterTarget();
+  const candidates = targets.filter(target => !isSameWritingTarget(target, currentTarget));
+  const target = chooseRandom(candidates.length ? candidates : targets);
+
+  openWritingCharacterTarget(target, true);
+}
+
+function previousRandomWritingCharacter() {
+  const previousTarget = writingCharacterHistory.pop();
+
+  if (!previousTarget) {
+    showWritingMessage("Пока нет предыдущего иероглифа.", "error");
+    return;
+  }
+
+  openWritingCharacterTarget(previousTarget, false);
 }
 
 function previousWritingCharacter() {
@@ -982,7 +1090,7 @@ function sendWordBackToNew(wordId) {
 // ---------- A) Подбор слов: соединить иероглифы с переводами ----------
 
 function nextMatchExercise() {
-  const words = shuffle(getMemoryWords()).slice(0, 5);
+  const words = shuffle(getAllWords()).slice(0, 8);
 
   if (words.length < 2) {
     currentMatchTask = null;
@@ -1020,9 +1128,9 @@ function renderMatchExercise() {
   }
 
   taskBox.innerHTML = `
-    <div class="memory-question">Соедини пары</div>
-    <p class="muted">
-      Слева — переводы. Справа — китайские слова. Нажми перевод и соответствующий иероглиф.
+    <div class="memory-question compact-memory-question">Соедини пары</div>
+    <p class="muted compact-muted">
+      Слева — перевод, справа — китайское слово. Пары берутся случайно из всего словаря.
     </p>
   `;
 
@@ -1183,13 +1291,9 @@ function nextRecallExercise() {
     return;
   }
 
-  const phrase = chooseRandom(phrases);
-  const taskTypes = ["translationToChinese", "translationToPinyin"];
-  const taskType = chooseRandom(taskTypes);
-
   currentRecallTask = {
-    phrase,
-    taskType
+    phrase: chooseRandom(phrases),
+    taskType: "translationToChinese"
   };
 
   renderRecallExercise();
@@ -1211,25 +1315,15 @@ function renderRecallExercise() {
     return;
   }
 
-  const { phrase, taskType } = currentRecallTask;
+  const { phrase } = currentRecallTask;
   const translation = phrase.translation || phrase.prompt || "Перевод не указан.";
 
-  if (taskType === "translationToChinese") {
-    taskBox.innerHTML = `
-      <div class="recall-russian">${escapeHTML(translation)}</div>
-      <p class="muted">Введи китайские иероглифы вручную. Звук здесь отключён.</p>
-    `;
-    input.placeholder = "Например: 我喜欢茶";
-  }
+  taskBox.innerHTML = `
+    <div class="recall-russian">${escapeHTML(translation)}</div>
+    <p class="muted">Введи только китайские иероглифы, которые соответствуют переводу. Pinyin здесь больше не используется.</p>
+  `;
 
-  if (taskType === "translationToPinyin") {
-    taskBox.innerHTML = `
-      <div class="recall-russian">${escapeHTML(translation)}</div>
-      <p class="muted">Введи pinyin. Тоны можно не писать.</p>
-    `;
-    input.placeholder = "Например: wo xihuan cha";
-  }
-
+  input.placeholder = "Например: 我喜欢茶";
   input.focus();
 }
 
@@ -1240,31 +1334,18 @@ function checkRecallAnswer() {
   if (!currentRecallTask || !input || !message) return;
 
   const answer = input.value.trim();
-  const { phrase, taskType } = currentRecallTask;
+  const { phrase } = currentRecallTask;
 
   const correctChinese = getPhraseChineseText(phrase).replace(/[。？！?!.，,、\s]/g, "");
-  const correctPinyin = getPhrasePinyinText(phrase);
+  const normalizedAnswer = answer.replace(/[。？！?!.，,、\s]/g, "");
 
-  let correct = false;
-  let correctAnswer = "";
-
-  if (taskType === "translationToChinese") {
-    correctAnswer = correctChinese;
-    correct = answer.replace(/[。？！?!.，,、\s]/g, "") === correctChinese;
-  }
-
-  if (taskType === "translationToPinyin") {
-    correctAnswer = correctPinyin;
-    correct = normalizePinyinAnswer(answer) === normalizePinyinAnswer(correctPinyin);
-  }
-
-  if (correct) {
+  if (normalizedAnswer === correctChinese) {
     markPhraseRecallSuccess(phrase);
     message.innerHTML = `
       <div class="reward-box">
         <div class="reward-stars">✨ ✓ ✨</div>
         <strong>Правильно.</strong>
-        <p>${escapeHTML(correctAnswer)}</p>
+        <p>${escapeHTML(correctChinese)}</p>
       </div>
     `;
     message.className = "message ok reward";
@@ -1276,7 +1357,7 @@ function checkRecallAnswer() {
   message.innerHTML = `
     <div class="mistake-box">
       <strong>Пока неправильно.</strong>
-      <p>Правильный ответ: ${escapeHTML(correctAnswer)}</p>
+      <p>Правильный ответ: ${escapeHTML(correctChinese)}</p>
     </div>
   `;
   message.className = "message error";
@@ -1323,6 +1404,8 @@ function normalizePinyinAnswer(value) {
     .replace(/\s+/g, "")
     .trim();
 }
+
+// ---------- C) Нарисовать без подсказок ----------
 
 // ---------- C) Нарисовать без подсказок ----------
 
@@ -1535,11 +1618,95 @@ function getAvailablePhrases() {
   return connected.length >= 5 ? connected : phrases;
 }
 
+function createSentenceBank(correctWords) {
+  const words = [...correctWords];
+  if (words.length <= 1) return words;
+
+  const correctKey = JSON.stringify(words);
+  const reversedKey = JSON.stringify([...words].reverse());
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const mixed = shuffle(words);
+    const mixedKey = JSON.stringify(mixed);
+
+    if (mixedKey !== correctKey && mixedKey !== reversedKey) {
+      return mixed;
+    }
+  }
+
+  // Запасной вариант: сдвигаем порядок, чтобы он не был ни правильным, ни просто обратным.
+  return [...words.slice(1), words[0]];
+}
+
+function normalizePhrase(phrase) {
+  const tokens = (phrase.tokens || []).filter(Boolean);
+  const words = tokens
+    .filter(token => token.wordId)
+    .map(token => getWordById(token.wordId))
+    .filter(Boolean);
+
+  const correct = phrase.correct || words.map(word => word.chinese);
+
+  return {
+    ...phrase,
+    tokens,
+    correct,
+    bank: createSentenceBank(correct),
+    prompt: phrase.prompt || `Собери: ${phrase.translation || "фразу"}`
+  };
+}
+
 function nextPhrase() {
   const phrases = getAvailablePhrases();
-  currentPhrase = chooseRandom(phrases);
+
+  if (!phrases.length) {
+    currentPhrase = null;
+    selectedBankIndexes = [];
+    sentenceAnswer = [];
+    renderSentence();
+    return;
+  }
+
+  if (currentPhrase) {
+    sentenceHistory.push(currentPhrase);
+    if (sentenceHistory.length > 20) sentenceHistory.shift();
+  }
+
+  let next = chooseRandom(phrases);
+
+  if (phrases.length > 1 && currentPhrase) {
+    let attempts = 0;
+    while (next.id === currentPhrase.id && attempts < 8) {
+      next = chooseRandom(phrases);
+      attempts += 1;
+    }
+  }
+
+  currentPhrase = normalizePhrase(next);
   selectedBankIndexes = [];
   sentenceAnswer = [];
+  lastSentenceCheckWasCorrect = false;
+  renderSentence();
+}
+
+function previousPhraseAction() {
+  if (!sentenceHistory.length) {
+    const message = document.getElementById("sentenceMessage");
+    if (message) {
+      message.innerHTML = `
+        <div class="sentence-mini-error">
+          <strong>Пока нет предыдущего предложения.</strong>
+        </div>
+      `;
+      message.className = "message error sentence-fixed-message";
+    }
+    return;
+  }
+
+  currentPhrase = normalizePhrase(sentenceHistory.pop());
+  selectedBankIndexes = [];
+  sentenceAnswer = [];
+  lastSentenceCheckWasCorrect = false;
   renderSentence();
 }
 
@@ -1824,13 +1991,20 @@ function checkSentence() {
     lastSentenceCheckWasCorrect = true;
 
     message.innerHTML = `
-      <div class="reward-box">
-        <div class="reward-stars">✨ ✓ ✨</div>
-        <strong>Предложение построено правильно.</strong>
-        <p>Отлично. Слова стали сильнее в памяти.</p>
+      <div class="sentence-mini-reward">
+        <span>✨</span>
+        <strong>Правильно.</strong>
+        <span>Следующее предложение...</span>
       </div>
     `;
-    message.className = "message ok reward";
+    message.className = "message ok reward sentence-fixed-message";
+
+    setTimeout(function() {
+      if (lastSentenceCheckWasCorrect) {
+        nextPhrase();
+      }
+    }, 900);
+
     return true;
   }
 
@@ -1845,12 +2019,12 @@ function checkSentence() {
   lastSentenceCheckWasCorrect = false;
 
   message.innerHTML = `
-    <div class="mistake-box">
-      <strong>Порядок пока неправильный.</strong>
-      <p>Попробуй переставить слова и нажми “Проверить предложение”.</p>
+    <div class="sentence-mini-error">
+      <strong>Пока нет.</strong>
+      <span>Переставь слова и проверь ещё раз.</span>
     </div>
   `;
-  message.className = "message error";
+  message.className = "message error sentence-fixed-message";
   return false;
 }
 
