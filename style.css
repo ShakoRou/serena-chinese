@@ -1116,3 +1116,304 @@ input, select {
   font-weight: 900;
   color: #2b1452;
 }
+
+
+/* =====================================================
+   Финальная полировка упражнений: письмо, предложения, память
+   ===================================================== */
+
+.writing-actions {
+  justify-content: center;
+}
+
+.message.reward,
+.message.ok.reward {
+  animation: rewardPulse 0.75s ease;
+  border: 1px solid rgba(39, 174, 96, 0.35);
+  background: linear-gradient(135deg, #eafff2, #ffffff);
+}
+
+@keyframes rewardPulse {
+  0% {
+    transform: scale(0.98);
+    box-shadow: 0 0 0 rgba(39, 174, 96, 0);
+  }
+
+  50% {
+    transform: scale(1.02);
+    box-shadow: 0 18px 42px rgba(39, 174, 96, 0.22);
+  }
+
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 rgba(39, 174, 96, 0);
+  }
+}
+
+.mistake-box {
+  padding: 12px;
+  border-radius: 18px;
+  background: #fff1f1;
+}
+
+.sentence-prompt-card {
+  padding: 14px;
+}
+
+.sentence-mini-title {
+  font-size: 18px;
+  font-weight: 900;
+  color: #2b1452;
+  margin-bottom: 8px;
+}
+
+.sentence-task-translation {
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1.45;
+  color: #2b1452;
+  margin-bottom: 10px;
+}
+
+.grammar-hint {
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: #f4edff;
+  color: #4a247f;
+  font-size: 15px;
+}
+
+.sentence-hidden-source.compact {
+  font-size: 14px;
+  padding: 9px 12px;
+}
+
+.sentence-build {
+  min-height: 90px;
+  padding: 18px;
+  border-radius: 24px;
+  background: #ffffff;
+  border: 2px dashed rgba(111, 63, 216, 0.22);
+}
+
+.sentence-build .word-chip {
+  font-size: 24px;
+  padding: 14px 18px;
+  border-radius: 18px;
+}
+
+.word-bank .word-chip {
+  font-size: 22px;
+  padding: 13px 17px;
+}
+
+.recall-russian {
+  font-size: 24px;
+  line-height: 1.45;
+  font-weight: 900;
+  color: #2b1452;
+}
+
+.draw-character-picker {
+  justify-content: center;
+  margin: 12px 0;
+}
+
+.draw-character-picker .character-button {
+  min-width: 52px;
+  height: 48px;
+  font-size: 18px;
+}
+
+.memory-hanzi-target,
+.hanzi-box {
+  box-shadow: 0 16px 34px rgba(52, 25, 96, 0.08);
+}
+
+@media (max-width: 650px) {
+  .sentence-build .word-chip {
+    font-size: 21px;
+  }
+
+  .word-bank .word-chip {
+    font-size: 20px;
+  }
+
+  .sentence-task-translation,
+  .recall-russian {
+    font-size: 21px;
+  }
+}
+
+
+/* =====================================================
+   Запоминание: компактная форточка слова вместо большой встройки
+   ===================================================== */
+
+.sentence-popup-host {
+  display: none;
+}
+
+.sentence-task-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.sentence-audio-button {
+  white-space: nowrap;
+  min-height: 44px;
+}
+
+.phrase-token {
+  position: relative;
+  cursor: pointer;
+}
+
+.phrase-token:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(52, 25, 96, 0.12);
+}
+
+.phrase-punctuation {
+  display: inline-block;
+  padding: 4px 2px;
+  color: #715f89;
+}
+
+.sentence-word-popup {
+  position: fixed;
+  z-index: 9999;
+  top: 86px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-12px);
+  width: min(360px, calc(100vw - 28px));
+  padding: 18px;
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at 10% 15%, rgba(255, 255, 255, 0.96), transparent 35%),
+    linear-gradient(135deg, #ffffff, #f5edff);
+  border: 1px solid rgba(111, 63, 216, 0.18);
+  box-shadow: 0 24px 70px rgba(52, 25, 96, 0.24);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.sentence-word-popup.open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+
+.sentence-popup-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  color: #4a247f;
+  box-shadow: none;
+}
+
+.sentence-popup-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.sentence-popup-actions button {
+  flex: 1;
+}
+
+@media (max-width: 650px) {
+  .sentence-task-row {
+    grid-template-columns: 1fr;
+  }
+
+  .sentence-word-popup {
+    top: 72px;
+  }
+}
+
+
+/* =====================================================
+   БЛОК 5: Понимание текста — редактирование, слова, звук
+   ===================================================== */
+
+.reading-list-item {
+  grid-template-columns: 1fr auto auto;
+}
+
+.small-edit {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 14px;
+  background: #f1eaff;
+  color: #4a247f;
+  box-shadow: none;
+}
+
+.reading-word {
+  display: inline-block;
+  margin: 0 1px;
+  padding: 0 5px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.reading-word:hover {
+  transform: translateY(-1px);
+}
+
+.reading-word.known {
+  background: rgba(241, 234, 255, 0.78);
+  color: #4a247f;
+}
+
+.reading-word.unknown {
+  background: rgba(255, 236, 215, 0.88);
+  color: #8a4d00;
+  border-bottom: 1px dashed rgba(138, 77, 0, 0.45);
+}
+
+.reading-text-popup {
+  position: fixed;
+  z-index: 9999;
+  top: 86px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-12px);
+  width: min(380px, calc(100vw - 28px));
+  padding: 18px;
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at 10% 15%, rgba(255, 255, 255, 0.96), transparent 35%),
+    linear-gradient(135deg, #ffffff, #f5edff);
+  border: 1px solid rgba(111, 63, 216, 0.18);
+  box-shadow: 0 24px 70px rgba(52, 25, 96, 0.24);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.reading-text-popup.open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+
+@media (max-width: 650px) {
+  .reading-text-popup {
+    top: 72px;
+  }
+
+  .reading-list-item {
+    grid-template-columns: 1fr auto auto;
+  }
+}
