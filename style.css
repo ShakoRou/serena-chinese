@@ -1593,3 +1593,48 @@ input, select {
     padding: 7px 5px;
   }
 }
+
+
+/* =====================================================
+   v24: словарь, поиск текстов, память без подсказок
+   ===================================================== */
+
+.dictionary-word-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.dictionary-delete-button {
+  width: auto;
+  min-width: 92px;
+  height: auto;
+  padding: 9px 12px;
+}
+
+.dictionary-form-actions {
+  margin-top: 8px;
+}
+
+#readingSearchInput {
+  margin: 0 0 12px;
+}
+
+.draw-sound-row {
+  margin-top: 10px;
+}
+
+.draw-sound-row button {
+  width: auto;
+}
+
+@media (max-width: 650px) {
+  .dictionary-word-actions {
+    flex-direction: column;
+  }
+
+  .dictionary-word-actions button {
+    width: 100%;
+  }
+}
