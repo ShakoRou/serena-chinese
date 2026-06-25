@@ -76,8 +76,8 @@
       <div class="memory-tabs">
         <button id="memory-tab-sentence" class="secondary active" type="button" onclick="setMemoryExercise('sentence')">Строить предложения</button>
         <button id="memory-tab-match" class="secondary" type="button" onclick="setMemoryExercise('match')">Подбор слов</button>
-        <button id="memory-tab-recall" class="secondary" type="button" onclick="setMemoryExercise('recall')">Вспомнить иероглиф</button>
-        <button id="memory-tab-draw" class="secondary" type="button" onclick="setMemoryExercise('draw')">Нарисовать без подсказок</button>
+        <button id="memory-tab-draw" class="secondary" type="button" onclick="setMemoryExercise('draw')">Ханзи</button>
+        <button id="memory-tab-recall" class="secondary" type="button" onclick="setMemoryExercise('recall')">Ввести ханзи</button>
       </div>
 
       <section id="memoryExerciseSentence" class="memory-exercise">
@@ -123,17 +123,6 @@
         </div>
       </section>
 
-      <section id="memoryExerciseRecall" class="memory-exercise hidden">
-        <p class="muted">Вспомни ответ и введи его вручную.</p>
-        <div id="recallTaskBox" class="memory-task-box"></div>
-        <input id="recallInput" placeholder="Введи ответ здесь..." onkeydown="if(event.key === 'Enter') checkRecallAnswer()">
-        <div id="recallMessage" class="message"></div>
-        <div class="button-row">
-          <button onclick="checkRecallAnswer()">Проверить</button>
-          <button class="secondary" onclick="nextRecallExercise()">Следующее</button>
-        </div>
-      </section>
-
       <section id="memoryExerciseDraw" class="memory-exercise hidden">
         <p class="muted">Вспомни и напиши иероглиф без контура и без готового символа.</p>
         <div id="drawTaskBox" class="memory-task-box"></div>
@@ -147,6 +136,18 @@
           <button class="secondary" onclick="nextDrawExercise()">Следующее слово →</button>
         </div>
       </section>
+
+      <section id="memoryExerciseRecall" class="memory-exercise hidden">
+        <p class="muted">Введи ханзи по переводу. Поле закреплено, чтобы страница не дёргалась при переходе.</p>
+        <div id="recallTaskBox" class="memory-task-box"></div>
+        <input id="recallInput" placeholder="Введи ответ здесь..." onkeydown="if(event.key === 'Enter') checkRecallAnswer()">
+        <div id="recallMessage" class="message"></div>
+        <div class="button-row">
+          <button onclick="checkRecallAnswer()">Проверить</button>
+          <button class="secondary" onclick="nextRecallExercise()">Следующее</button>
+        </div>
+      </section>
+
     </section>
 
 
