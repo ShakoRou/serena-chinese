@@ -1638,3 +1638,42 @@ input, select {
     width: 100%;
   }
 }
+
+
+/* =====================================================
+   v25: draw without hints — stable canvas and hidden hanzi
+   ===================================================== */
+
+#memoryHanziTarget.memory-hanzi-target,
+.memory-hanzi-target {
+  width: min(340px, calc(100vw - 56px));
+  height: min(340px, calc(100vw - 56px));
+  min-width: min(340px, calc(100vw - 56px));
+  min-height: min(340px, calc(100vw - 56px));
+  margin: 16px auto;
+}
+
+.draw-meaning-highlight {
+  display: inline-block;
+  padding: 12px 18px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, #fff2c9, #f2e9ff);
+  border: 1px solid rgba(111, 63, 216, 0.18);
+  color: #35196b;
+  box-shadow: 0 14px 32px rgba(52, 25, 96, 0.10);
+}
+
+@media (max-width: 650px) {
+  #memoryHanziTarget.memory-hanzi-target,
+  .memory-hanzi-target {
+    width: min(320px, calc(100vw - 56px));
+    height: min(320px, calc(100vw - 56px));
+    min-width: min(320px, calc(100vw - 56px));
+    min-height: min(320px, calc(100vw - 56px));
+  }
+
+  .draw-meaning-highlight {
+    font-size: 22px;
+    line-height: 1.25;
+  }
+}
