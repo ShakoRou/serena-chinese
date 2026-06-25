@@ -10,6 +10,8 @@
 
 const PROGRESS_KEY = "serenaChineseProgressV2";
 const CUSTOM_WORDS_KEY = "serenaChineseCustomWordsV2";
+const WORD_OVERRIDES_KEY = "serenaChineseWordOverridesV1";
+const DELETED_WORDS_KEY = "serenaChineseDeletedWordIdsV1";
 const CUSTOM_PHRASES_KEY = "serenaChineseCustomPhrasesV1";
 const CUSTOM_TEXTS_KEY = "serenaChineseCustomTextsV1";
 const LESSON_KEY = "serenaChineseCurrentLessonV2";
@@ -22,10 +24,13 @@ const basePhrases = Array.isArray(window.SERENA_PHRASES) ? window.SERENA_PHRASES
 
 let progress = loadJSON(PROGRESS_KEY, {});
 let customWords = loadJSON(CUSTOM_WORDS_KEY, []);
+let wordOverrides = loadJSON(WORD_OVERRIDES_KEY, []);
+let deletedWordIds = loadJSON(DELETED_WORDS_KEY, []);
 let customPhrases = loadJSON(CUSTOM_PHRASES_KEY, []);
 let readingTexts = loadJSON(CUSTOM_TEXTS_KEY, []);
 let currentReadingTextId = readingTexts.length ? readingTexts[0].id : null;
 let currentReadingPopupText = "";
+let lastReadingSelectedChinese = "";
 let currentLesson = loadJSON(LESSON_KEY, []);
 let currentCardIndex = 0;
 let currentMode = "cards";
@@ -107,14 +112,34 @@ function escapeHTML(value) {
 }
 
 function getAllWords() {
-  const map = new Map();
-  [...baseDictionary, ...customWords].forEach(word => {
-    if (word && word.id && !map.has(word.id)) {
-      map.set(word.id, word);
+  const deletedSet = new Set(deletedWordIds);
+  const overrideMap = new Map();
+
+  wordOverrides.forEach(word => {
+    if (word && word.id) {
+      overrideMap.set(word.id, word);
     }
   });
+
+  const map = new Map();
+
+  [...baseDictionary, ...customWords].forEach(word => {
+    if (!word || !word.id || deletedSet.has(word.id)) return;
+
+    const override = overrideMap.get(word.id);
+    const finalWord = override
+      ? { ...word, ...override, id: word.id }
+      : word;
+
+    if (!map.has(finalWord.id)) {
+      map.set(finalWord.id, finalWord);
+    }
+  });
+
   return [...map.values()];
 }
+
+
 
 function getAllPhrases() {
   return [...basePhrases, ...customPhrases].filter(Boolean);
@@ -1465,11 +1490,17 @@ function renderDrawExercise() {
       Pinyin слова: ${escapeHTML(currentDrawTask.word.pinyin)}.
       Напиши ${number}-й иероглиф из ${total}. Сам иероглиф скрыт.
     </p>
+    <div class="draw-sound-row">
+      <button class="secondary small-button" type="button" onclick="speakDrawWord()">🔊 ${escapeHTML(currentDrawTask.word.chinese)}</button>
+    </div>
   `;
 
+  speakChinese(currentDrawTask.word.chinese);
   renderDrawCharacterButtons();
   loadMemoryHanziWriter();
 }
+
+
 
 function renderDrawCharacterButtons() {
   const picker = document.getElementById("drawCharacters");
@@ -1547,7 +1578,7 @@ function startMemoryDrawQuiz() {
     return;
   }
 
-  message.textContent = "Пиши иероглиф. Приложение проверит черты.";
+  message.textContent = "Пиши иероглиф. Приложение проверит черты автоматически.";
   message.className = "message";
 
   memoryHanziWriter.quiz({
@@ -1566,17 +1597,46 @@ function startMemoryDrawQuiz() {
 
     onComplete: function(summaryData) {
       markMemorySuccess(currentDrawTask.word.id);
+
+      const currentCharacter = currentDrawTask.character;
+      const isLastCharacter = currentDrawTask.characterIndex >= currentDrawTask.characters.length - 1;
+      const nextIndex = isLastCharacter ? 0 : currentDrawTask.characterIndex + 1;
+      const nextCharacter = currentDrawTask.characters[nextIndex];
+
       message.innerHTML = `
         <div class="reward-box">
           <div class="reward-stars">✨ ✓ ✨</div>
           <strong>Иероглиф написан правильно.</strong>
-          <p>Это был ${escapeHTML(currentDrawTask.character)}. Ошибок: ${summaryData.totalMistakes}</p>
+          <p>Это был ${escapeHTML(currentCharacter)}. Ошибок: ${summaryData.totalMistakes}</p>
+          <p>${isLastCharacter ? "Слово закончено. Начинаем это же слово заново." : "Переходим к следующему иероглифу этого же слова."}</p>
         </div>
       `;
       message.className = "message ok reward";
+
+      setTimeout(function() {
+        if (!currentDrawTask) return;
+        selectDrawCharacter(nextIndex);
+      }, 950);
     }
   });
 }
+
+function resetMemoryDrawCanvas() {
+  if (!currentDrawTask) {
+    nextDrawExercise();
+    return;
+  }
+
+  loadMemoryHanziWriter();
+}
+
+function speakDrawWord() {
+  if (!currentDrawTask || !currentDrawTask.word) return;
+
+  speakChinese(currentDrawTask.word.chinese);
+}
+
+
 
 function escapeForInline(value) {
   return String(value ?? "")
@@ -2159,17 +2219,31 @@ function renderDictionary() {
           <option value="review" ${item.status === "review" ? "selected" : ""}>повторение</option>
           <option value="learned" ${item.status === "learned" ? "selected" : ""}>выученные</option>
         </select>
+
+        <div class="dictionary-word-actions">
+          <button class="secondary small-button" type="button" onclick="editDictionaryWord('${escapeHTML(word.id)}')">✎ Редактировать</button>
+          <button class="small-danger dictionary-delete-button" type="button" onclick="deleteDictionaryWord('${escapeHTML(word.id)}')">Удалить</button>
+        </div>
       </div>
     `;
   }).join("");
 }
 
-function addCustomWord() {
-  const chinese = document.getElementById("newChinese").value.trim();
-  const pinyin = document.getElementById("newPinyin").value.trim();
-  const meaning = document.getElementById("newMeaning").value.trim();
-  const type = document.getElementById("newType").value;
+
+
+function saveDictionaryWord() {
+  const editingInput = document.getElementById("editingWordId");
+  const chineseInput = document.getElementById("newChinese");
+  const pinyinInput = document.getElementById("newPinyin");
+  const meaningInput = document.getElementById("newMeaning");
+  const typeInput = document.getElementById("newType");
   const message = document.getElementById("addWordMessage");
+
+  const editingId = editingInput ? editingInput.value.trim() : "";
+  const chinese = chineseInput ? chineseInput.value.trim() : "";
+  const pinyin = pinyinInput ? pinyinInput.value.trim() : "";
+  const meaning = meaningInput ? meaningInput.value.trim() : "";
+  const type = typeInput ? typeInput.value : "noun";
 
   if (!chinese || !pinyin || !meaning) {
     message.textContent = "Заполни иероглифы, pinyin и перевод.";
@@ -2177,9 +2251,48 @@ function addCustomWord() {
     return;
   }
 
-  if (getWordByChinese(chinese)) {
+  const duplicate = getAllWords().find(word => word.chinese === chinese && word.id !== editingId);
+
+  if (duplicate) {
     message.textContent = "Такое слово уже есть в словаре.";
     message.className = "message error";
+    return;
+  }
+
+  if (editingId) {
+    const original = getWordById(editingId);
+
+    if (!original) {
+      message.textContent = "Не удалось найти слово для редактирования.";
+      message.className = "message error";
+      return;
+    }
+
+    const updatedWord = {
+      id: editingId,
+      chinese,
+      pinyin,
+      meaning,
+      level: original.level || 1,
+      type
+    };
+
+    const customIndex = customWords.findIndex(word => word.id === editingId);
+
+    if (customIndex >= 0) {
+      customWords[customIndex] = updatedWord;
+      saveJSON(CUSTOM_WORDS_KEY, customWords);
+    } else {
+      wordOverrides = wordOverrides.filter(word => word.id !== editingId);
+      wordOverrides.push(updatedWord);
+      saveJSON(WORD_OVERRIDES_KEY, wordOverrides);
+    }
+
+    message.textContent = "Слово сохранено.";
+    message.className = "message ok";
+    cancelDictionaryEdit(false);
+    renderAll();
+    renderDictionary();
     return;
   }
 
@@ -2191,13 +2304,114 @@ function addCustomWord() {
   message.textContent = "Слово добавлено.";
   message.className = "message ok";
 
-  document.getElementById("newChinese").value = "";
-  document.getElementById("newPinyin").value = "";
-  document.getElementById("newMeaning").value = "";
+  clearDictionaryForm(false);
 
   renderAll();
   renderDictionary();
 }
+
+function addCustomWord() {
+  saveDictionaryWord();
+}
+
+function editDictionaryWord(wordId) {
+  const word = getWordById(wordId);
+  const message = document.getElementById("addWordMessage");
+
+  if (!word) {
+    if (message) {
+      message.textContent = "Не удалось найти слово.";
+      message.className = "message error";
+    }
+    return;
+  }
+
+  const details = document.querySelector(".dictionary-add-box");
+  const title = document.getElementById("dictionaryFormTitle");
+  const editingInput = document.getElementById("editingWordId");
+  const chineseInput = document.getElementById("newChinese");
+  const pinyinInput = document.getElementById("newPinyin");
+  const meaningInput = document.getElementById("newMeaning");
+  const typeInput = document.getElementById("newType");
+  const saveButton = document.getElementById("saveWordButton");
+
+  if (details) details.open = true;
+  if (title) title.textContent = "Редактировать слово";
+  if (editingInput) editingInput.value = word.id;
+  if (chineseInput) chineseInput.value = word.chinese;
+  if (pinyinInput) pinyinInput.value = word.pinyin;
+  if (meaningInput) meaningInput.value = word.meaning;
+  if (typeInput) typeInput.value = word.type || "noun";
+  if (saveButton) saveButton.textContent = "Сохранить изменения";
+
+  if (message) {
+    message.textContent = "Редактирование включено.";
+    message.className = "message ok";
+  }
+
+  setTimeout(function() {
+    const addBox = document.querySelector(".dictionary-add-box");
+    if (addBox) addBox.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, 100);
+}
+
+function deleteDictionaryWord(wordId) {
+  const word = getWordById(wordId);
+  if (!word) return;
+
+  const ok = confirm(`Удалить слово ${word.chinese}?`);
+  if (!ok) return;
+
+  customWords = customWords.filter(item => item.id !== wordId);
+  wordOverrides = wordOverrides.filter(item => item.id !== wordId);
+
+  const isBaseWord = baseDictionary.some(item => item && item.id === wordId);
+
+  if (isBaseWord && !deletedWordIds.includes(wordId)) {
+    deletedWordIds.push(wordId);
+  }
+
+  saveJSON(CUSTOM_WORDS_KEY, customWords);
+  saveJSON(WORD_OVERRIDES_KEY, wordOverrides);
+  saveJSON(DELETED_WORDS_KEY, deletedWordIds);
+
+  if (selectedWritingWordId === wordId) {
+    selectedWritingWordId = null;
+  }
+
+  clearDictionaryForm(false);
+  renderAll();
+}
+
+function clearDictionaryForm(clearMessage = true) {
+  const editingInput = document.getElementById("editingWordId");
+  const chineseInput = document.getElementById("newChinese");
+  const pinyinInput = document.getElementById("newPinyin");
+  const meaningInput = document.getElementById("newMeaning");
+  const typeInput = document.getElementById("newType");
+  const saveButton = document.getElementById("saveWordButton");
+  const title = document.getElementById("dictionaryFormTitle");
+  const message = document.getElementById("addWordMessage");
+
+  if (editingInput) editingInput.value = "";
+  if (chineseInput) chineseInput.value = "";
+  if (pinyinInput) pinyinInput.value = "";
+  if (meaningInput) meaningInput.value = "";
+  if (typeInput) typeInput.value = "noun";
+  if (saveButton) saveButton.textContent = "Добавить слово";
+  if (title) title.textContent = "Добавить слово";
+
+  if (clearMessage && message) {
+    message.textContent = "";
+    message.className = "message";
+  }
+}
+
+function cancelDictionaryEdit(clearMessage = true) {
+  clearDictionaryForm(clearMessage);
+}
+
+
 
 // =====================================================
 // БЛОК 5: ПОНИМАНИЕ ТЕКСТА
@@ -2373,6 +2587,8 @@ function renderReading() {
   const view = document.getElementById("readingTextView");
   const translation = document.getElementById("readingTranslationBox");
   const manual = document.getElementById("readingManualTranslationView");
+  const searchInput = document.getElementById("readingSearchInput");
+  const search = searchInput ? searchInput.value.trim() : "";
 
   if (!list || !title || !view || !translation || !manual) return;
 
@@ -2385,7 +2601,22 @@ function renderReading() {
     return;
   }
 
-  list.innerHTML = readingTexts.map(item => `
+  const visibleTexts = getFilteredReadingTexts(search);
+
+  if (!visibleTexts.length) {
+    list.innerHTML = `<p class="muted">По этому запросу текстов не найдено.</p>`;
+    title.textContent = "Текст не выбран";
+    view.innerHTML = `<p class="muted">Попробуй другой иероглиф, pinyin или ключевое слово.</p>`;
+    translation.innerHTML = `<p class="muted">Нет текста для анализа.</p>`;
+    manual.innerHTML = `<p class="muted">Нет заметок для показа.</p>`;
+    return;
+  }
+
+  if (!visibleTexts.some(item => item.id === currentReadingTextId)) {
+    currentReadingTextId = visibleTexts[0].id;
+  }
+
+  list.innerHTML = visibleTexts.map(item => `
     <div class="reading-list-item ${item.id === currentReadingTextId ? "active" : ""}">
       <button type="button" onclick="selectReadingText('${escapeHTML(item.id)}')">
         ${escapeHTML(item.title)}
@@ -2404,6 +2635,62 @@ function renderReading() {
     ? `<p>${escapeHTML(item.manualTranslation).replaceAll("\n", "<br>")}</p>`
     : `<p class="muted">Ты не добавила свой перевод к этому тексту.</p>`;
 }
+
+function getFilteredReadingTexts(search) {
+  const query = String(search || "").trim();
+
+  if (!query) {
+    return readingTexts;
+  }
+
+  return readingTexts.filter(item => readingTextMatchesSearch(item, query));
+}
+
+function readingTextMatchesSearch(item, query) {
+  const directQuery = query.toLowerCase();
+  const normalizedQuery = normalizeReadingSearch(query);
+
+  const title = String(item.title || "").toLowerCase();
+  const text = String(item.text || "").toLowerCase();
+  const manualTranslation = String(item.manualTranslation || "").toLowerCase();
+
+  if (
+    title.includes(directQuery) ||
+    text.includes(directQuery) ||
+    manualTranslation.includes(directQuery)
+  ) {
+    return true;
+  }
+
+  const matchingWords = getAllWords().filter(word => {
+    const pinyin = normalizeReadingSearch(word.pinyin);
+    const meaning = normalizeReadingSearch(word.meaning);
+    const chinese = String(word.chinese || "");
+
+    return (
+      chinese.includes(query) ||
+      pinyin.includes(normalizedQuery) ||
+      meaning.includes(normalizedQuery)
+    );
+  });
+
+  return matchingWords.some(word => item.text.includes(word.chinese));
+}
+
+function normalizeReadingSearch(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replaceAll("ü", "u")
+    .replaceAll("v", "u")
+    .replace(/[0-9]/g, "")
+    .replace(/[。？！?!.，,、'"“”‘’/\\()[\]{}:;_-]/g, "")
+    .replace(/\s+/g, "")
+    .trim();
+}
+
+
 
 function renderInteractiveReadingText(text) {
   const tokens = tokenizeReadingText(text);
@@ -2562,9 +2849,22 @@ function openWritingFromReadingPopup(wordId) {
   openWritingForWord(wordId);
 }
 
-function addSelectedChineseToDictionary() {
+
+function rememberReadingSelection() {
   const selection = window.getSelection ? window.getSelection().toString() : "";
   const chineseOnly = Array.from(selection).filter(char => isChineseCharacter(char)).join("");
+
+  if (chineseOnly) {
+    lastReadingSelectedChinese = chineseOnly;
+  }
+}
+
+function addSelectedChineseToDictionary() {
+  rememberReadingSelection();
+
+  const selection = window.getSelection ? window.getSelection().toString() : "";
+  const currentSelection = Array.from(selection).filter(char => isChineseCharacter(char)).join("");
+  const chineseOnly = currentSelection || lastReadingSelectedChinese;
 
   if (!chineseOnly) {
     alert("Сначала выдели китайское слово в тексте мышкой или пальцем.");
@@ -2573,6 +2873,8 @@ function addSelectedChineseToDictionary() {
 
   prepareAddWordFromText(chineseOnly);
 }
+
+
 
 function prepareAddWordFromText(chineseText) {
   const cleanText = Array.from(String(chineseText || ""))
@@ -2586,6 +2888,10 @@ function prepareAddWordFromText(chineseText) {
 
   hideReadingTextPopup();
   showMode("dictionary");
+
+  if (typeof cancelDictionaryEdit === "function") {
+    cancelDictionaryEdit(false);
+  }
 
   const details = document.querySelector(".dictionary-add-box");
   if (details) details.open = true;
@@ -2650,6 +2956,8 @@ function findKnownWordsInText(text) {
 
   return result.slice(0, 80);
 }
+
+document.addEventListener("selectionchange", rememberReadingSelection);
 
 // =====================================================
 // ФИНАЛ: сброс, общий рендер, запуск приложения
