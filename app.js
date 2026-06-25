@@ -44,6 +44,8 @@ let currentMemoryExercise = "sentence";
 let currentMatchTask = null;
 let currentRecallTask = null;
 let currentDrawTask = null;
+let drawWordHistory = [];
+let drawAutoSpokenWordId = null;
 let memoryHanziWriter = null;
 let lastSentenceCheckWasCorrect = false;
 let sentenceHistory = [];
@@ -1444,11 +1446,24 @@ function nextDrawExercise() {
 
   if (!words.length) {
     currentDrawTask = null;
+    drawAutoSpokenWordId = null;
     renderDrawExercise();
     return;
   }
 
-  const word = chooseRandom(words);
+  if (currentDrawTask && currentDrawTask.word) {
+    drawWordHistory.push(currentDrawTask.word.id);
+
+    if (drawWordHistory.length > 50) {
+      drawWordHistory.shift();
+    }
+  }
+
+  const candidates = currentDrawTask
+    ? words.filter(word => word.id !== currentDrawTask.word.id)
+    : words;
+
+  const word = chooseRandom(candidates.length ? candidates : words);
   const characters = getCharactersFromWord(word);
 
   currentDrawTask = {
@@ -1458,6 +1473,46 @@ function nextDrawExercise() {
     character: characters[0]
   };
 
+  drawAutoSpokenWordId = null;
+  renderDrawExercise();
+}
+
+
+
+function previousDrawExercise() {
+  const previousWordId = drawWordHistory.pop();
+
+  if (!previousWordId) {
+    const message = document.getElementById("drawMessage");
+    if (message) {
+      message.textContent = "Пока нет предыдущего слова.";
+      message.className = "message error";
+    }
+    return;
+  }
+
+  const word = getWordById(previousWordId);
+
+  if (!word) {
+    previousDrawExercise();
+    return;
+  }
+
+  const characters = getCharactersFromWord(word);
+
+  if (!characters.length) {
+    previousDrawExercise();
+    return;
+  }
+
+  currentDrawTask = {
+    word,
+    characters,
+    characterIndex: 0,
+    character: characters[0]
+  };
+
+  drawAutoSpokenWordId = null;
   renderDrawExercise();
 }
 
@@ -1485,20 +1540,23 @@ function renderDrawExercise() {
   const number = currentDrawTask.characterIndex + 1;
 
   taskBox.innerHTML = `
-    <div class="memory-question">${escapeHTML(currentDrawTask.word.meaning)}</div>
+    <div class="memory-question draw-meaning-highlight">${escapeHTML(currentDrawTask.word.meaning)}</div>
     <p class="muted">
       Pinyin слова: ${escapeHTML(currentDrawTask.word.pinyin)}.
       Напиши ${number}-й иероглиф из ${total}. Сам иероглиф скрыт.
     </p>
-    <div class="draw-sound-row">
-      <button class="secondary small-button" type="button" onclick="speakDrawWord()">🔊 ${escapeHTML(currentDrawTask.word.chinese)}</button>
-    </div>
   `;
 
-  speakChinese(currentDrawTask.word.chinese);
+  if (drawAutoSpokenWordId !== currentDrawTask.word.id) {
+    drawAutoSpokenWordId = currentDrawTask.word.id;
+    speakChinese(currentDrawTask.word.chinese);
+  }
+
   renderDrawCharacterButtons();
   loadMemoryHanziWriter();
 }
+
+
 
 
 
@@ -1525,6 +1583,16 @@ function selectDrawCharacter(index) {
   renderDrawExercise();
 }
 
+function getMemoryHanziBoxSize() {
+  const screenWidth = window.innerWidth || 360;
+
+  if (screenWidth <= 420) {
+    return Math.max(260, Math.min(320, screenWidth - 56));
+  }
+
+  return 340;
+}
+
 function loadMemoryHanziWriter() {
   const target = document.getElementById("memoryHanziTarget");
   const message = document.getElementById("drawMessage");
@@ -1540,10 +1608,12 @@ function loadMemoryHanziWriter() {
     return;
   }
 
-  const size = Math.min(340, Math.max(260, target.clientWidth || 320));
+  const size = getMemoryHanziBoxSize();
 
   target.style.width = size + "px";
   target.style.height = size + "px";
+  target.style.minWidth = size + "px";
+  target.style.minHeight = size + "px";
 
   memoryHanziWriter = HanziWriter.create("memoryHanziTarget", currentDrawTask.character, {
     width: size,
@@ -1566,6 +1636,8 @@ function loadMemoryHanziWriter() {
     }
   });
 }
+
+
 
 function startMemoryDrawQuiz() {
   const message = document.getElementById("drawMessage");
@@ -1598,16 +1670,14 @@ function startMemoryDrawQuiz() {
     onComplete: function(summaryData) {
       markMemorySuccess(currentDrawTask.word.id);
 
-      const currentCharacter = currentDrawTask.character;
       const isLastCharacter = currentDrawTask.characterIndex >= currentDrawTask.characters.length - 1;
       const nextIndex = isLastCharacter ? 0 : currentDrawTask.characterIndex + 1;
-      const nextCharacter = currentDrawTask.characters[nextIndex];
 
       message.innerHTML = `
         <div class="reward-box">
           <div class="reward-stars">✨ ✓ ✨</div>
           <strong>Иероглиф написан правильно.</strong>
-          <p>Это был ${escapeHTML(currentCharacter)}. Ошибок: ${summaryData.totalMistakes}</p>
+          <p>Ошибок: ${summaryData.totalMistakes}</p>
           <p>${isLastCharacter ? "Слово закончено. Начинаем это же слово заново." : "Переходим к следующему иероглифу этого же слова."}</p>
         </div>
       `;
@@ -1621,6 +1691,8 @@ function startMemoryDrawQuiz() {
   });
 }
 
+
+
 function resetMemoryDrawCanvas() {
   if (!currentDrawTask) {
     nextDrawExercise();
@@ -1629,6 +1701,8 @@ function resetMemoryDrawCanvas() {
 
   loadMemoryHanziWriter();
 }
+
+
 
 function speakDrawWord() {
   if (!currentDrawTask || !currentDrawTask.word) return;
