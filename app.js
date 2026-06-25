@@ -269,12 +269,18 @@ function showMode(mode) {
   document.getElementById(mode + "Mode").classList.remove("hidden");
   document.getElementById("tab-" + mode).classList.add("active");
 
+  if (mode === "sentences") {
+    currentMemoryExercise = "sentence";
+  }
+
   if (mode === "cards") renderCard();
   if (mode === "writing") renderWriting();
   if (mode === "sentences") renderMemory();
   if (mode === "dictionary") renderDictionary();
   if (mode === "reading") renderReading();
 }
+
+
 
 function startNewLesson() {
   const words = getAllWords();
@@ -1354,8 +1360,13 @@ function renderRecallExercise() {
   `;
 
   input.placeholder = "Например: 我喜欢茶";
-  input.focus();
+
+  setTimeout(function() {
+    input.focus({ preventScroll: true });
+  }, 30);
 }
+
+
 
 function checkRecallAnswer() {
   const input = document.getElementById("recallInput");
