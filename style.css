@@ -1677,3 +1677,53 @@ input, select {
     line-height: 1.25;
   }
 }
+
+
+/* =====================================================
+   v26: memory default tab + fixed recall input
+   ===================================================== */
+
+#memoryExerciseRecall {
+  min-height: 420px;
+}
+
+#memoryExerciseRecall #recallTaskBox {
+  min-height: 150px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+#recallInput {
+  display: block;
+  width: 100%;
+  min-height: 58px;
+  line-height: 1.35;
+  margin: 12px 0;
+}
+
+#recallMessage {
+  min-height: 78px;
+}
+
+.memory-tabs {
+  align-items: center;
+}
+
+@media (max-width: 650px) {
+  #memoryExerciseRecall {
+    min-height: 460px;
+  }
+
+  #memoryExerciseRecall #recallTaskBox {
+    min-height: 165px;
+  }
+
+  #recallInput {
+    font-size: 20px;
+  }
+
+  #recallMessage {
+    min-height: 92px;
+  }
+}
