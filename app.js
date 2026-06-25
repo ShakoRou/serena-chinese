@@ -14,7 +14,10 @@ const CUSTOM_PHRASES_KEY = "serenaChineseCustomPhrasesV1";
 const CUSTOM_TEXTS_KEY = "serenaChineseCustomTextsV1";
 const LESSON_KEY = "serenaChineseCurrentLessonV2";
 
-const baseDictionary = Array.isArray(window.SERENA_DICTIONARY) ? window.SERENA_DICTIONARY.filter(Boolean) : [];
+const baseDictionary = [
+  ...(Array.isArray(window.SERENA_DICTIONARY) ? window.SERENA_DICTIONARY.filter(Boolean) : []),
+  ...(Array.isArray(window.SERENA_DICTIONARY_EXTRA) ? window.SERENA_DICTIONARY_EXTRA.filter(Boolean) : [])
+];
 const basePhrases = Array.isArray(window.SERENA_PHRASES) ? window.SERENA_PHRASES.filter(Boolean) : [];
 
 let progress = loadJSON(PROGRESS_KEY, {});
@@ -854,21 +857,21 @@ function startHanziQuiz(isAutoStart = false) {
         renderStats();
       }
 
-      const hasNextCharacterInSameWord =
-        writingCharacters.length > 1 &&
-        writingCharacterIndex < writingCharacters.length - 1;
-
-      if (hasNextCharacterInSameWord) {
-        const nextCharacter = writingCharacters[writingCharacterIndex + 1];
+      if (writingCharacters.length > 1) {
+        const isLastCharacter = writingCharacterIndex >= writingCharacters.length - 1;
+        const nextIndex = isLastCharacter ? 0 : writingCharacterIndex + 1;
+        const nextCharacter = writingCharacters[nextIndex];
 
         showWritingMessage(
-          `Готово: ${currentCharacter}. Сейчас переходим к следующему иероглифу этого же слова: ${nextCharacter}`,
+          isLastCharacter
+            ? `Готово: ${currentCharacter}. Слово закончено, возвращаемся к первому иероглифу: ${nextCharacter}`
+            : `Готово: ${currentCharacter}. Переходим к следующему иероглифу этого же слова: ${nextCharacter}`,
           "ok reward"
         );
 
         setTimeout(function() {
-          selectWritingCharacter(writingCharacterIndex + 1);
-        }, 900);
+          selectWritingCharacter(nextIndex);
+        }, 850);
 
         return;
       }
@@ -881,22 +884,16 @@ function startHanziQuiz(isAutoStart = false) {
   });
 }
 
+
+
 function getAllWritingCharacterTargets() {
-  const targets = [];
-
-  getAllWords().forEach(word => {
-    const characters = getCharactersFromWord(word);
-
-    characters.forEach((character, index) => {
-      targets.push({
-        wordId: word.id,
-        characterIndex: index,
-        character
-      });
-    });
-  });
-
-  return targets;
+  return getAllWords()
+    .filter(word => getCharactersFromWord(word).length > 0)
+    .map(word => ({
+      wordId: word.id,
+      characterIndex: 0,
+      character: getCharactersFromWord(word)[0]
+    }));
 }
 
 function getCurrentWritingCharacterTarget() {
@@ -931,6 +928,7 @@ function openWritingCharacterTarget(target, rememberCurrent = true) {
   selectedWritingWordId = target.wordId;
   renderWriting();
 
+  // Важно: новое слово всегда начинается с первого иероглифа.
   if (writingCharacters[target.characterIndex]) {
     selectWritingCharacter(target.characterIndex);
   }
@@ -947,7 +945,11 @@ function nextRandomWritingCharacter() {
   }
 
   const currentTarget = getCurrentWritingCharacterTarget();
-  const candidates = targets.filter(target => !isSameWritingTarget(target, currentTarget));
+  const candidates = targets.filter(target => {
+    if (!currentTarget) return true;
+    return target.wordId !== currentTarget.wordId;
+  });
+
   const target = chooseRandom(candidates.length ? candidates : targets);
 
   openWritingCharacterTarget(target, true);
@@ -1188,13 +1190,14 @@ function renderMatchChineseButton(wordId) {
       class="${classes}"
       data-speak="${escapeHTML(pair.chinese)}"
       onclick="speakFromElement(this); selectMatchChinese('${escapeHTML(wordId)}')"
-      onmouseenter="speakFromElement(this, true)"
       ${pair.matched ? "disabled" : ""}
     >
       ${escapeHTML(pair.chinese)}
     </button>
   `;
 }
+
+
 
 function getMatchPair(wordId) {
   if (!currentMatchTask) return null;
@@ -1928,7 +1931,17 @@ function addSentenceWord(index) {
 
   renderSentenceBuild();
   renderWordBank();
+
+  const correct = currentPhrase.correct || [];
+
+  if (sentenceAnswer.length === correct.length) {
+    setTimeout(function() {
+      checkSentence();
+    }, 120);
+  }
 }
+
+
 
 function renderSentenceBuild() {
   const build = document.getElementById("sentenceBuild");
