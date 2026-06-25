@@ -141,7 +141,8 @@
         <div id="memoryHanziTarget" class="memory-hanzi-target"></div>
         <div id="drawMessage" class="message"></div>
         <div class="button-row">
-          <button onclick="startMemoryDrawQuiz()">Начать проверку</button>
+          <button onclick="resetMemoryDrawCanvas()">Очистить канву</button>
+          <button class="secondary" onclick="speakDrawWord()">🔊 Озвучить слово</button>
           <button class="secondary" onclick="nextDrawExercise()">Следующий иероглиф</button>
         </div>
       </section>
@@ -175,6 +176,7 @@
           <div id="readingMessage" class="message"></div>
 
           <h3>Мои тексты</h3>
+          <input id="readingSearchInput" oninput="renderReading()" placeholder="Поиск текста: иероглиф, pinyin или ключевое слово...">
           <div id="readingTextList" class="reading-text-list"></div>
         </div>
 
@@ -220,7 +222,8 @@
         </div>
 
         <details class="add-box dictionary-add-box">
-          <summary>Добавить слово</summary>
+          <summary id="dictionaryFormTitle">Добавить слово</summary>
+          <input id="editingWordId" type="hidden">
           <input id="newChinese" placeholder="Иероглифы, например: 爱">
           <input id="newPinyin" placeholder="pinyin, например: ài">
           <input id="newMeaning" placeholder="перевод, например: любовь / любить">
@@ -236,7 +239,10 @@
             <option value="time">time</option>
             <option value="phrase">phrase</option>
           </select>
-          <button onclick="addCustomWord()">Добавить слово</button>
+          <div class="button-row dictionary-form-actions">
+            <button id="saveWordButton" onclick="saveDictionaryWord()">Добавить слово</button>
+            <button class="secondary" onclick="cancelDictionaryEdit()">Отмена</button>
+          </div>
           <div id="addWordMessage" class="message"></div>
         </details>
       </div>
